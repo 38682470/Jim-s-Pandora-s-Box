@@ -422,30 +422,24 @@
        MODULE 3 PLACEHOLDER (CHARACTER MAP)
        ===================================================== -->
   <main id="map-view" class="view-section">
-    <!-- =====================================================
-         CHARACTER MAP MODULE (HIGH-FIDELITY)
+   <!-- =====================================================
+         CHARACTER MAP MODULE (SELF-CONTAINED BULLETPROOF ENGINE)
          ===================================================== -->
     
     <!-- Vis.js Graph Engine CDN -->
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 
     <style>
-      /* Character Map Layout */
-      .cmap-container { display: flex; height: 100%; width: 100%; background: var(--bg-main); overflow: hidden; }
-      .cmap-main { flex: 1; display: flex; flex-direction: column; position: relative; }
-      .cmap-sidebar { width: 340px; background: var(--bg-card); border-left: 1px solid var(--border-color); display: flex; flex-direction: column; box-shadow: -5px 0 20px rgba(0,0,0,0.5); z-index: 10; transition: transform 0.3s ease; }
-      
-      /* Network Canvas */
-     /* Network Canvas (Fixed Dimensions for Vis.js) */
-      #network-canvas { flex: 1; width: 100%; height: 100%; position: absolute; top: 0; left: 0; outline: none; }
+      .cmap-container { display: flex; height: 100%; width: 100%; background: var(--bg-main); overflow: hidden; position: relative; }
       .cmap-main { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+      .cmap-sidebar { width: 340px; background: var(--bg-card); border-left: 1px solid var(--border-color); display: flex; flex-direction: column; box-shadow: -5px 0 20px rgba(0,0,0,0.5); z-index: 10; }
       
-      /* Physics Controls Toolbar */
-      .cmap-toolbar { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border-color); padding: 10px 15px; display: flex; gap: 15px; align-items: center; z-index: 5; }
+      #network-canvas { flex: 1; width: 100%; height: 100%; position: absolute; top: 0; left: 0; outline: none; }
+      
+      .cmap-toolbar { background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border-color); padding: 10px 15px; display: flex; gap: 15px; align-items: center; z-index: 5; }
       .cmap-toolbar label { font-size: 0.75rem; color: var(--text-muted); font-weight: bold; display: flex; align-items: center; gap: 8px; }
       .cmap-toolbar input[type="range"] { accent-color: var(--accent-color); cursor: pointer; }
       
-      /* Sidebar Internals */
       .sidebar-header { padding: 15px; border-bottom: 1px solid var(--border-color); background: var(--bg-inner); display: flex; justify-content: space-between; align-items: center; }
       .sidebar-header h3 { color: var(--accent-color); font-size: 1.1rem; }
       .sidebar-content { padding: 15px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 12px; }
@@ -454,26 +448,13 @@
       .cmap-input, .cmap-select, .cmap-textarea { width: 100%; background: var(--bg-inner); border: 1px solid var(--border-color); color: var(--text-main); padding: 10px; border-radius: 6px; font-size: 0.9rem; font-family: inherit; }
       .cmap-textarea { height: 90px; resize: vertical; }
       
-      .faction-indicator { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: middle; }
-      
-      /* Edge Creation Mode Indicator */
-      .edge-mode-banner { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: #3b82f6; color: #fff; padding: 6px 16px; border-radius: 20px; font-weight: bold; font-size: 0.85rem; box-shadow: 0 4px 12px rgba(0,0,0,0.4); display: none; z-index: 10; pointer-events: none; }
-      
-      /* Placeholder State */
-      #cmap-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; width: 100%; color: var(--text-muted); text-align: center; padding: 40px; }
+      .edge-mode-banner { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); background: #3b82f6; color: #fff; padding: 6px 16px; border-radius: 20px; font-weight: bold; font-size: 0.85rem; box-shadow: 0 4px 12px rgba(0,0,0,0.4); display: none; z-index: 20; pointer-events: none; }
     </style>
 
-    <div id="cmap-placeholder">
-      <h2 style="color:var(--text-muted); margin-bottom:10px;">Character Map Inactive</h2>
-      <p>Please select an active book from the Home tab to render its relationship engine.</p>
-    </div>
-
-    <div id="cmap-active-layout" class="cmap-container" style="display: none;">
-      
+    <div id="cmap-active-layout" class="cmap-container">
       <div class="cmap-main">
         <div class="edge-mode-banner" id="edge-banner">🔗 Edge Mode: Click target node to connect...</div>
         
-        <!-- Top Physics & Tool Bar -->
         <div class="cmap-toolbar">
           <button class="pandora-btn" style="background:var(--accent-color); color:#000;" onclick="addNewCharacter()">+ New Character</button>
           <button class="pandora-btn" id="btn-link-mode" onclick="toggleEdgeMode()">🔗 Add Link</button>
@@ -486,11 +467,9 @@
           </label>
         </div>
 
-        <!-- Render Target -->
         <div id="network-canvas"></div>
       </div>
 
-      <!-- Right Hand Node Detail Sidebar -->
       <div class="cmap-sidebar" id="node-sidebar">
         <div class="sidebar-header">
           <h3 id="sidebar-title">Character Details</h3>
@@ -543,6 +522,253 @@
       </div>
     </div>
 
+    <script>
+      let network = null;
+      let nodesDataset = null;
+      let edgesDataset = null;
+      let isEdgeMode = false;
+      let edgeSourceNode = null;
+      
+      const FactionColors = {
+        protagonist: { border: '#2563eb', background: '#1e3a8a', highlight: { border: '#60a5fa', background: '#1e3a8a' } },
+        antagonist: { border: '#dc2626', background: '#7f1d1d', highlight: { border: '#f87171', background: '#7f1d1d' } },
+        supporting: { border: '#16a34a', background: '#14532d', highlight: { border: '#4ade80', background: '#14532d' } },
+        neutral: { border: '#d97706', background: '#78350f', highlight: { border: '#fbbf24', background: '#78350f' } },
+        location: { border: '#7c3aed', background: '#4c1d95', highlight: { border: '#a78bfa', background: '#4c1d95' } },
+        default: { border: '#f59e0b', background: '#1e293b' }
+      };
+
+      // Bulletproof global hook on tab click
+      document.querySelectorAll('[data-target="map-view"]').forEach(el => {
+        el.addEventListener('click', () => {
+          setTimeout(() => renderCharacterMap(), 50);
+        });
+      });
+
+      function renderCharacterMap() {
+        // Ensure PandoraState exists
+        if (typeof PandoraState === 'undefined') {
+          window.PandoraState = { activeBookId: 'default_book', books: {} };
+        }
+        
+        if (!PandoraState.activeBookId || !PandoraState.books[PandoraState.activeBookId]) {
+          const keys = Object.keys(PandoraState.books);
+          if (keys.length > 0) {
+            PandoraState.activeBookId = keys[0];
+          } else {
+            PandoraState.activeBookId = 'book_' + Date.now();
+            PandoraState.books[PandoraState.activeBookId] = { title: 'Default Book', nodes: [], edges: [], flashcards: [] };
+          }
+        }
+
+        const book = PandoraState.books[PandoraState.activeBookId];
+        
+        // Inject 10-node template if empty
+        if (!book.nodes || book.nodes.length === 0) {
+          book.nodes = [
+            { id: 'peter', label: 'Peter Andersson', title: 'General Manager', group: 'neutral', value: 40, color: FactionColors.neutral },
+            { id: 'kira', label: 'Kira Andersson', title: 'Spouse', group: 'protagonist', value: 30, color: FactionColors.protagonist },
+            { id: 'benji', label: 'Benji', title: 'Player', group: 'supporting', value: 30, color: FactionColors.supporting },
+            { id: 'char4', label: 'Character 4', group: 'neutral', value: 25, color: FactionColors.neutral },
+            { id: 'char5', label: 'Character 5', group: 'neutral', value: 25, color: FactionColors.neutral },
+            { id: 'char6', label: 'Character 6', group: 'neutral', value: 25, color: FactionColors.neutral },
+            { id: 'char7', label: 'Character 7', group: 'neutral', value: 25, color: FactionColors.neutral },
+            { id: 'char8', label: 'Character 8', group: 'neutral', value: 25, color: FactionColors.neutral },
+            { id: 'char9', label: 'Character 9', group: 'neutral', value: 25, color: FactionColors.neutral },
+            { id: 'char10', label: 'Character 10', group: 'neutral', value: 25, color: FactionColors.neutral }
+          ];
+          book.edges = [
+            { from: 'peter', to: 'kira', label: 'Spouse' },
+            { from: 'peter', to: 'benji', label: 'Player' },
+            { from: 'peter', to: 'char4' }, { from: 'peter', to: 'char5' },
+            { from: 'peter', to: 'char6' }, { from: 'peter', to: 'char7' },
+            { from: 'peter', to: 'char8' }, { from: 'peter', to: 'char9' },
+            { from: 'peter', to: 'char10' }
+          ];
+        }
+
+        nodesDataset = new vis.DataSet(book.nodes);
+        edgesDataset = new vis.DataSet(book.edges);
+
+        const container = document.getElementById('network-canvas');
+        const data = { nodes: nodesDataset, edges: edgesDataset };
+
+        const options = {
+          nodes: {
+            shape: 'dot', borderWidth: 3, borderWidthSelected: 5,
+            font: { color: '#f8fafc', size: 14, face: '-apple-system', strokeWidth: 3, strokeColor: '#0f172a' },
+            shadow: { enabled: true, color: 'rgba(0,0,0,0.6)', size: 10, x: 5, y: 5 }
+          },
+          edges: {
+            width: 2, selectionWidth: 3, color: { color: '#64748b', highlight: '#f59e0b' },
+            font: { color: '#94a3b8', size: 12, strokeWidth: 2, strokeColor: '#0f172a', align: 'top' },
+            smooth: { type: 'continuous' }, arrows: { to: { enabled: true, scaleFactor: 0.5 } }
+          },
+          physics: {
+            enabled: true, stabilization: false,
+            barnesHut: {
+              gravitationalConstant: parseInt(document.getElementById('phys-gravity').value),
+              centralGravity: 0.15,
+              springLength: parseInt(document.getElementById('phys-springs').value),
+              springConstant: 0.04, damping: 0.09
+            }
+          },
+          interaction: { hover: true, tooltipDelay: 200 }
+        };
+
+        if (network) network.destroy();
+        network = new vis.Network(container, data, options);
+
+        setTimeout(() => {
+          if (network) { network.redraw(); network.fit(); }
+        }, 150);
+
+        network.on("selectNode", function (params) {
+          if (isEdgeMode) handleEdgeCreation(params.nodes[0]);
+          else populateSidebarNode(params.nodes[0]);
+        });
+        network.on("selectEdge", function (params) {
+          if (params.nodes.length === 0) populateSidebarEdge(params.edges[0]);
+        });
+        network.on("deselectNode", function () { clearSidebar(); });
+      }
+
+      function updatePhysics() {
+        if (!network) return;
+        network.setOptions({
+          physics: {
+            barnesHut: {
+              gravitationalConstant: parseInt(document.getElementById('phys-gravity').value),
+              springLength: parseInt(document.getElementById('phys-springs').value)
+            }
+          }
+        });
+      }
+
+      function toggleEdgeMode() {
+        isEdgeMode = !isEdgeMode;
+        const btn = document.getElementById('btn-link-mode');
+        const banner = document.getElementById('edge-banner');
+        if (isEdgeMode) {
+          btn.style.background = '#3b82f6'; btn.style.color = '#fff';
+          banner.style.display = 'block';
+          edgeSourceNode = network.getSelectedNodes()[0] || null;
+        } else {
+          btn.style.background = 'var(--bg-card)'; btn.style.color = 'var(--text-main)';
+          banner.style.display = 'none'; edgeSourceNode = null;
+        }
+      }
+
+      function handleEdgeCreation(targetNodeId) {
+        if (!edgeSourceNode) {
+          edgeSourceNode = targetNodeId;
+          document.getElementById('edge-banner').innerText = "🔗 Source selected. Click target node to link...";
+          return;
+        }
+        if (edgeSourceNode === targetNodeId) { toggleEdgeMode(); return; }
+        const label = prompt("Enter relationship description (e.g. 'Sibling', 'Enemies'):");
+        if (label !== null) {
+          edgesDataset.add({ id: 'edge_' + Date.now(), from: edgeSourceNode, to: targetNodeId, label: label });
+          syncMapStateToPandora();
+        }
+        toggleEdgeMode();
+      }
+
+      function clearSidebar() {
+        document.getElementById('sidebar-title').innerText = "Character Details";
+        document.getElementById('sidebar-id').innerText = "";
+        document.getElementById('node-id').value = "";
+        document.getElementById('node-label').value = "";
+        document.getElementById('node-title').value = "";
+        document.getElementById('node-group').value = "neutral";
+        document.getElementById('node-size').value = 30;
+        document.getElementById('node-size-val').innerText = "30";
+        document.getElementById('node-image').value = "";
+        document.getElementById('node-notes').value = "";
+      }
+
+      function populateSidebarNode(nodeId) {
+        const node = nodesDataset.get(nodeId);
+        if (!node) return;
+        document.getElementById('sidebar-title').innerText = "Edit Character";
+        document.getElementById('sidebar-id').innerText = `ID: ${node.id.substring(0,8)}...`;
+        document.getElementById('node-id').value = node.id;
+        document.getElementById('node-label').value = node.label || "";
+        document.getElementById('node-title').value = node.title || "";
+        document.getElementById('node-group').value = node.group || "neutral";
+        document.getElementById('node-size').value = node.value || 30;
+        document.getElementById('node-size-val').innerText = node.value || 30;
+        document.getElementById('node-image').value = (node.shape === 'circularImage') ? node.image : "";
+        document.getElementById('node-notes').value = node.notes || "";
+      }
+
+      function populateSidebarEdge(edgeId) {
+        clearSidebar();
+        const edge = edgesDataset.get(edgeId);
+        if (!edge) return;
+        document.getElementById('sidebar-title').innerText = "Edit Relationship";
+        document.getElementById('sidebar-id').innerText = `Edge: ${edgeId.substring(0,8)}...`;
+        document.getElementById('node-id').value = edge.id;
+        document.getElementById('node-label').value = edge.label || "";
+      }
+
+      function addNewCharacter() {
+        const newId = 'node_' + Date.now();
+        nodesDataset.add({ id: newId, label: "New Character", group: "neutral", value: 30, color: FactionColors.neutral });
+        syncMapStateToPandora();
+        network.selectNodes([newId]);
+        populateSidebarNode(newId);
+      }
+
+      function saveSelectedNode() {
+        const id = document.getElementById('node-id').value;
+        if (!id) return;
+        const label = document.getElementById('node-label').value;
+        if (id.startsWith('edge_')) {
+          edgesDataset.update({ id: id, label: label });
+        } else {
+          const group = document.getElementById('node-group').value;
+          const title = document.getElementById('node-title').value;
+          const val = parseInt(document.getElementById('node-size').value);
+          const img = document.getElementById('node-image').value;
+          const notes = document.getElementById('node-notes').value;
+          const updatedNode = {
+            id: id, label: label, title: title, group: group, value: val, notes: notes,
+            color: FactionColors[group] || FactionColors.default
+          };
+          if (img) { updatedNode.shape = 'circularImage'; updatedNode.image = img; }
+          else { updatedNode.shape = 'dot'; }
+          nodesDataset.update(updatedNode);
+        }
+        syncMapStateToPandora();
+      }
+
+      function deleteSelectedElement() {
+        const selectedNodes = network.getSelectedNodes();
+        const selectedEdges = network.getSelectedEdges();
+        if (selectedNodes.length === 0 && selectedEdges.length === 0) return;
+        if (confirm("Delete selected item(s)?")) {
+          if (selectedNodes.length > 0) nodesDataset.remove(selectedNodes);
+          if (selectedEdges.length > 0) edgesDataset.remove(selectedEdges);
+          clearSidebar();
+          syncMapStateToPandora();
+        }
+      }
+
+      function syncMapStateToPandora() {
+        const activeId = PandoraState.activeBookId;
+        if (activeId && nodesDataset && edgesDataset) {
+          PandoraState.books[activeId].nodes = nodesDataset.get();
+          PandoraState.books[activeId].edges = edgesDataset.get();
+          if (typeof saveGlobalState === 'function') saveGlobalState();
+        }
+      }
+
+      // Auto-trigger on page load if map view is active
+      window.addEventListener('load', () => {
+        setTimeout(() => renderCharacterMap(), 200);
+      });
+    </script>
     <script>
       let network = null;
       let nodesDataset = null;
