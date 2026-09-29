@@ -1,686 +1,990 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Jim's Pandora's Box</title>
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
-    <style>
-        :root {
-            --bg: #1e1e1e; --panel: #2a2a2a; --text: #f0f0f0; --accent: #0A84FF; --border: #333;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        body { background-color: var(--bg); color: var(--text); overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
-        
-        /* Navigation */
-        nav { background: rgba(20, 20, 20, 0.9); padding: 10px; display: flex; gap: 10px; border-bottom: 1px solid var(--border); z-index: 100; backdrop-filter: blur(10px); }
-        button, .btn { background: var(--panel); color: var(--text); border: 1px solid var(--border); padding: 8px 16px; border-radius: 8px; cursor: pointer; text-decoration: none; display: inline-block; font-size: 14px; }
-        button:hover, .btn:hover { background: #3a3a3a; }
-        button.active { background: var(--accent); color: white; border-color: var(--accent); }
-        .flex-spacer { flex-grow: 1; }
-        
-        /* Views */
-        .view { display: none; flex: 1; overflow-y: auto; position: relative; height: calc(100vh - 50px); }
-        .view.active { display: flex; flex-direction: column; }
-        
-        /* Home View */
-        #home-view { background-size: cover; background-position: center; padding: 20px; align-items: center; justify-content: center; }
-        .home-card { background: rgba(42, 42, 42, 0.85); padding: 30px; border-radius: 16px; backdrop-filter: blur(20px); text-align: center; max-width: 500px; width: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .home-card h1 { margin-bottom: 20px; }
-        .home-card input, .home-card select { width: 100%; margin-bottom: 15px; padding: 10px; background: #111; color: #fff; border: 1px solid var(--border); border-radius: 8px; }
-        
-        /* Shared Header (Gemini Link) */
-        .section-header { padding: 10px 20px; background: #1a1a1a; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
-        .gemini-btn { background: #4285F4; border-color: #4285F4; color: white; font-weight: bold; }
-        
-        /* Chapter View */
-        #chapter-view { flex-direction: column; }
-        .chapter-content { flex: 1; display: flex; overflow: hidden; position: relative; }
-        .text-editor { flex: 1; padding: 20px; overflow-y: auto; border-right: 1px solid var(--border); font-size: 18px; line-height: 1.6; }
-        [contenteditable]:empty:before { content: attr(placeholder); color: #888; display: block; }
-        
-        /* Canvas */
-        .canvas-container { flex: 1; position: relative; background: #222; overflow: hidden; display: flex; flex-direction: column; }
-        .canvas-toolbar { padding: 10px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; gap: 10px; align-items: center; }
-        canvas { flex: 1; background: #2a2a2b; touch-action: none; cursor: crosshair; }
-        
-        /* Map View */
-        #map-view .map-container { flex: 1; display: flex; overflow: hidden; }
-        #network-canvas { flex: 1; background: #1a1a1a; }
-        .sidebar { width: 300px; background: var(--panel); border-left: 1px solid var(--border); padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
-        .sidebar input, .sidebar textarea { width: 100%; background: #111; border: 1px solid var(--border); color: var(--text); padding: 10px; border-radius: 8px; font-family: inherit; }
-        .sidebar textarea { resize: vertical; min-height: 100px; }
-        
-        /* Flashcard View */
-        #flashcard-view .fc-container { padding: 20px; max-width: 800px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 20px; }
-        .fc-stats { display: flex; justify-content: space-between; background: var(--panel); padding: 15px; border-radius: 12px; }
-        .fc-stats div { text-align: center; }
-        .fc-stats span { display: block; font-size: 24px; font-weight: bold; color: var(--accent); }
-        .card { background: var(--panel); min-height: 300px; border-radius: 16px; padding: 30px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; font-size: 24px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 1px solid var(--border); cursor: pointer; position: relative; }
-        .card-controls { display: flex; gap: 10px; justify-content: center; margin-top: 20px; }
-        .card-controls button { flex: 1; padding: 15px; font-size: 16px; font-weight: bold; }
-        .btn-hard { background: #FF453A; border-color: #FF453A; }
-        .btn-good { background: #32D74B; border-color: #32D74B; }
-        .btn-easy { background: #0A84FF; border-color: #0A84FF; }
-        
-        /* Modal */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; }
-        .modal { background: var(--panel); padding: 25px; border-radius: 16px; width: 90%; max-width: 500px; border: 1px solid var(--border); }
-        .modal h2 { margin-bottom: 20px; }
-        .modal-body { display: flex; flex-direction: column; gap: 15px; }
-        .snapshot-list { max-height: 200px; overflow-y: auto; background: #111; border-radius: 8px; padding: 10px; }
-        .snapshot-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #333; align-items: center; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Jim's Pandora's Box</title>
+  
+  <style>
+    /* =====================================================
+       PANDORA'S BOX GLOBAL SHELL CSS
+       ===================================================== */
+    :root {
+      --bg-main: #0f172a;
+      --bg-card: #1e293b;
+      --bg-inner: #0f172a;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-color: #334155;
+      --accent-color: #f59e0b;
+      --accent-glow: rgba(245, 158, 11, 0.25);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    
+    body { 
+      background-color: var(--bg-main); 
+      color: var(--text-main); 
+      overflow: hidden; 
+      display: flex; 
+      flex-direction: column; 
+      height: 100vh; 
+    }
+
+    /* Global Navigation */
+    nav { background: rgba(15, 23, 42, 0.95); padding: 12px; display: flex; gap: 10px; border-bottom: 1px solid var(--border-color); z-index: 1000; align-items: center; }
+    .nav-btn, .pandora-btn { background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: bold; }
+    .nav-btn:hover, .pandora-btn:hover { background: #334155; }
+    .nav-btn.active { background: var(--accent-color); color: #000; border-color: var(--accent-color); }
+    .flex-spacer { flex-grow: 1; }
+    
+    .gemini-btn { background: #4285F4 !important; border-color: #4285F4 !important; color: white !important; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 14px; }
+    
+    /* View Containers */
+    .view-section { display: none; flex: 1; overflow-y: auto; height: calc(100vh - 60px); position: relative; }
+    .view-section.active { display: block; }
+    
+    /* Home View (Base Shell) */
+    #home-view { padding: 40px 20px; background-size: cover; background-position: center; display: none; align-items: center; justify-content: center; }
+    #home-view.active { display: flex; }
+    .home-panel { background: rgba(30, 41, 59, 0.9); backdrop-filter: blur(15px); padding: 30px; border-radius: 16px; border: 1px solid var(--border-color); max-width: 600px; width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+    .home-panel h2 { margin-bottom: 20px; color: var(--accent-color); text-align: center; }
+    .home-form-group { margin-bottom: 15px; }
+    .home-form-group label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 5px; font-weight: bold; }
+    .home-form-group input, .home-form-group select { width: 100%; background: var(--bg-inner); border: 1px solid var(--border-color); color: var(--text-main); padding: 10px; border-radius: 8px; font-size: 1rem; }
+    
+    /* Library Center Modal */
+    .lib-modal { display: none; position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.8); z-index: 2000; justify-content: center; align-items: center; }
+    .lib-modal-content { background: var(--bg-card); padding: 25px; border-radius: 12px; border: 1px solid var(--border-color); width: 90%; max-width: 500px; }
+
+    /* =====================================================
+       EBBINGHAUS FLASHCARD MODULE CSS (PRESERVED EXACTLY)
+       ===================================================== */
+    .fc-wrapper { padding: 20px; max-width: 1000px; margin: 0 auto; }
+    .fc-header { text-align: center; margin-bottom: 20px; }
+    .fc-header h1 { color: var(--accent-color); font-size: 2rem; margin-bottom: 4px; transition: color 0.3s ease; }
+    .fc-header p { color: var(--text-muted); font-size: 0.85rem; }
+    .metric-badge { display: inline-block; margin-top: 8px; padding: 4px 12px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px; font-size: 0.8rem; font-weight: 700; color: var(--text-muted); transition: all 0.3s ease; }
+    .bookshelf-wrapper { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; margin-bottom: 20px; }
+    .bookshelf-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 12px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+    .bookshelf-grid { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 8px; }
+    .book-tile { flex: 0 0 120px; height: 160px; border-radius: 8px; border: 3px solid var(--border-color); background: var(--bg-inner); cursor: pointer; overflow: visible; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 6px; transition: all 0.2s ease; position: relative; }
+    .book-tile:hover { transform: translateY(-3px); }
+    .book-tile.active { box-shadow: 0 0 14px var(--accent-glow); }
+    .book-tile.interleaved-selected { border-color: #3b82f6 !important; box-shadow: 0 0 10px rgba(59, 130, 246, 0.4); }
+    .book-tile img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
+    .book-fallback { font-size: 0.75rem; font-weight: bold; padding: 4px; }
+    .delete-deck-btn { position: absolute; top: -8px; right: -8px; background-color: #dc2626; color: white; border: 2px solid var(--bg-card); border-radius: 50%; width: 24px; height: 24px; font-size: 14px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 10; opacity: 0; transition: opacity 0.2s ease, transform 0.1s ease; padding: 0; }
+    .book-tile:hover .delete-deck-btn { opacity: 1; }
+    .delete-deck-btn:hover { background-color: #b91c1c; transform: scale(1.1); }
+    .delete-deck-btn:active { transform: scale(0.9); }
+    .leitner-bar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 16px; } /* Changed to 7 cols for DUE */
+    .box-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; text-align: center; }
+    .box-card .box-label { font-size: 0.65rem; color: var(--text-muted); font-weight: bold; }
+    .box-card .box-count { font-size: 1.3rem; font-weight: bold; color: var(--accent-color); }
+    .controls-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+    .controls-group { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    select, button.fc-btn { background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color); padding: 10px 14px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; font-weight: 600; }
+    button.btn-action { background: var(--accent-color); color: #000; border: none; padding: 10px 14px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; font-weight: 600;}
+    button.btn-toggle-active { background: #3b82f6; color: #fff; border-color: #2563eb; }
+    .toggle-label { font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; background: var(--bg-card); padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; }
+    .technique-tabs { display: flex; gap: 4px; background: var(--bg-card); padding: 6px; border-radius: 10px 10px 0 0; border: 1px solid var(--border-color); border-bottom: none; }
+    .tab-btn { flex: 1; padding: 10px; text-align: center; background: transparent; border: none; color: var(--text-muted); font-weight: 700; font-size: 0.85rem; border-radius: 6px; transition: all 0.2s ease; cursor: pointer; }
+    .tab-btn.active { background: var(--accent-color); color: #000; }
+    
+    /* 3D Flip Mechanics & Core Card Styling */
+    .card-container { background: var(--bg-card); border: 2px solid var(--accent-color); border-radius: 0 0 12px 12px; padding: 24px; min-height: 380px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 6px 24px var(--accent-glow); transition: border-color 0.3s ease; perspective: 1000px; }
+    .card-meta { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); font-weight: bold; letter-spacing: 0.5px; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+    .card-prompt { font-size: 1.15rem; font-weight: 600; line-height: 1.5; margin-bottom: 16px; }
+    .prompt-image-container { margin: 12px 0 20px 0; text-align: center; }
+    .prompt-image { max-width: 100%; max-height: 280px; border-radius: 8px; border: 1px solid var(--border-color); object-fit: contain; background: var(--bg-inner); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    .fc-textarea, .fc-input { width: 100%; background: var(--bg-inner); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-main); padding: 12px; font-size: 0.9rem; font-family: inherit; margin-bottom: 12px; }
+    .fc-textarea { height: 100px; resize: vertical; }
+    .model-answer-box { background: var(--bg-inner); border-left: 4px solid var(--accent-color); padding: 14px; border-radius: 4px; font-size: 0.95rem; line-height: 1.5; margin-top: 12px; }
+    .cloze-target { background: var(--accent-color); color: #000; padding: 2px 8px; border-radius: 4px; font-weight: bold; }
+    
+    .anki-rating-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 20px; }
+    .btn-again { background: #dc2626; color: #fff; border: none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold;}
+    .btn-hard  { background: #ea580c; color: #fff; border: none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold;}
+    .btn-good  { background: #16a34a; color: #fff; border: none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold;}
+    .btn-easy  { background: #2563eb; color: #fff; border: none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold;}
+    .btn-again:hover { background: #b91c1c; } .btn-hard:hover { background: #c2410c; } .btn-good:hover { background: #15803d; } .btn-easy:hover { background: #1d4ed8; }
+    
+    .fc-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 3000; display: none; align-items: center; justify-content: center; }
+    .fc-modal-content { background: var(--bg-card); padding: 24px; border-radius: 12px; width: 90%; max-width: 650px; max-height: 85vh; overflow-y: auto; border: 1px solid var(--border-color); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    .hidden { display: none !important; }
+  </style>
 </head>
 <body>
 
-    <!-- Global Navigation -->
-    <nav>
-        <button class="nav-btn active" data-target="home-view">🏠 Home</button>
-        <button class="nav-btn" data-target="chapter-view">📝 Chapter Review</button>
-        <button class="nav-btn" data-target="map-view">🕸️ Character Map</button>
-        <button class="nav-btn" data-target="flashcard-view">🃏 Flashcards</button>
-        <div class="flex-spacer"></div>
-        <span id="current-book-label" style="align-self: center; color: #aaa; font-weight: bold; margin-right: 15px;">No Book Selected</span>
-        <button onclick="openLibrary()">📚 Library Center</button>
-    </nav>
+  <!-- =====================================================
+       GLOBAL NAVIGATION BAR
+       ===================================================== -->
+  <nav>
+    <button class="nav-btn active" data-target="home-view">🏠 Home</button>
+    <button class="nav-btn" data-target="chapter-view">📝 Chapter Review</button>
+    <button class="nav-btn" data-target="map-view">🕸️ Character Map</button>
+    <button class="nav-btn" data-target="flashcard-view">🃏 Flashcards</button>
+    <div class="flex-spacer"></div>
+    <span id="global-book-label" style="font-weight: bold; color: var(--text-muted); margin-right: 15px;">No Book Selected</span>
+    <a href="#" id="global-gemini-link" class="gemini-btn hidden" target="_blank">Launch Gemini Notebook</a>
+    <button class="pandora-btn" onclick="openLibraryModal()" style="margin-left: 10px;">📚 Library Backup</button>
+  </nav>
 
-    <!-- Home View -->
-    <main id="home-view" class="view active">
-        <div class="home-card">
-            <h1>Pandora's Box</h1>
-            <label style="display:block; text-align:left; margin-bottom:5px;">Select Book Context:</label>
-            <select id="book-selector" onchange="switchBook()"></select>
-            
-            <button onclick="createNewBook()" style="width:100%; margin-bottom:20px; background:var(--accent);">+ Create New Book Folder</button>
-            
-            <label style="display:block; text-align:left; margin-bottom:5px;">Set Custom Wallpaper:</label>
-            <input type="file" id="wallpaper-upload" accept="image/*" onchange="handleWallpaper(event)">
-            
-            <hr style="border: 0; height: 1px; background: var(--border); margin: 20px 0;">
-            <a href="freeform://" class="btn" style="width:100%; font-size:18px; font-weight:bold; background:#fff; color:#000;">Launch iPad Freeform</a>
-        </div>
-    </main>
+  <!-- =====================================================
+       HOME VIEW (BASE SHELL BOOK ENGINE)
+       ===================================================== -->
+  <main id="home-view" class="view-section active">
+    <div class="home-panel">
+      <h2>Pandora's Box Configuration</h2>
+      
+      <div class="home-form-group">
+        <label>Select Active Book</label>
+        <select id="home-book-select" onchange="switchActiveBook()"></select>
+      </div>
 
-    <!-- Chapter Review View -->
-    <main id="chapter-view" class="view">
-        <div class="section-header">
-            <h2>Chapter Review</h2>
-            <a href="#" class="btn gemini-btn gemini-link" target="_blank">Launch Gemini Notebook</a>
-        </div>
-        <div class="chapter-content">
-            <div class="text-editor" id="chapter-text" contenteditable="true" placeholder="Start typing your review, notes, and summaries here..." oninput="triggerSave()"></div>
-            <div class="canvas-container">
-                <div class="canvas-toolbar">
-                    <button id="tool-pen" class="active" onclick="setTool('pen')">✏️ Pen</button>
-                    <button id="tool-eraser" onclick="setTool('eraser')">🧽 Eraser</button>
-                    <input type="color" id="pen-color" value="#ffffff" onchange="triggerSave()">
-                    <input type="range" id="pen-width" min="1" max="20" value="3" onchange="triggerSave()">
-                    <div class="flex-spacer"></div>
-                    <button onclick="clearCanvas()">🗑️ Clear</button>
-                </div>
-                <canvas id="drawing-canvas"></canvas>
-            </div>
-        </div>
-    </main>
+      <div style="display:flex; gap:10px; margin-bottom: 20px;">
+        <button class="pandora-btn" style="flex:1; background: var(--accent-color); color:#000;" onclick="createNewBook()">+ Create New Book</button>
+        <button class="pandora-btn" style="flex:1;" onclick="editActiveBook()">Edit Metadata</button>
+        <button class="pandora-btn" style="flex:1; background: #dc2626; color:white; border:none;" onclick="deleteActiveBook()">Delete Book</button>
+      </div>
 
-    <!-- Character Map View -->
-    <main id="map-view" class="view">
-        <div class="section-header">
-            <h2>Character Map</h2>
-            <a href="#" class="btn gemini-btn gemini-link" target="_blank">Launch Gemini Notebook</a>
-        </div>
-        <div class="map-container">
-            <div id="network-canvas"></div>
-            <div class="sidebar">
-                <h3>Character Details</h3>
-                <input type="hidden" id="node-id">
-                <label>Name:</label>
-                <input type="text" id="node-label" oninput="updateNodeUI()">
-                <label>Role/Description:</label>
-                <input type="text" id="node-role" oninput="updateNodeUI()">
-                <label>Notes:</label>
-                <textarea id="node-notes" oninput="updateNodeUI()"></textarea>
-                <button onclick="saveNodeData()" style="background:var(--accent);">Save Node Data</button>
-            </div>
-        </div>
-    </main>
+      <div class="home-form-group">
+        <label>Set Global Wallpaper (Home Screen)</label>
+        <input type="file" accept="image/*" onchange="setGlobalWallpaper(event)">
+      </div>
 
-    <!-- Flashcard View -->
-    <main id="flashcard-view" class="view">
-        <div class="section-header">
-            <h2>Ebbinghaus Studio</h2>
-            <div>
-                <select id="study-mode" style="padding:8px; border-radius:6px; background:#111; color:#fff; border:1px solid var(--border); margin-right:10px;">
-                    <option value="active">Active Recall</option>
-                    <option value="feynman">Feynman Mode</option>
-                    <option value="cloze">Cloze Deletion</option>
-                </select>
-                <a href="#" class="btn gemini-btn gemini-link" target="_blank">Launch Gemini Notebook</a>
-            </div>
-        </div>
-        <div class="fc-container">
-            <div class="fc-stats">
-                <div><span id="stat-due">0</span>Due Cards</div>
-                <div><span id="stat-b1">0</span>Box 1</div>
-                <div><span id="stat-b2">0</span>Box 2</div>
-                <div><span id="stat-b3">0</span>Box 3</div>
-                <div><span id="stat-mastered">0</span>Mastered</div>
-            </div>
-            
-            <button onclick="addFlashcard()">+ Add New Card</button>
-
-            <div class="card" id="active-card" onclick="flipCard()">
-                <div id="card-content">No due cards! You're all caught up.</div>
-            </div>
-            
-            <div class="card-controls" id="card-controls" style="display:none;">
-                <button class="btn-hard" onclick="gradeCard(1)">Hard (Soon)</button>
-                <button class="btn-good" onclick="gradeCard(2)">Good (SM-2)</button>
-                <button class="btn-easy" onclick="gradeCard(3)">Easy (Master)</button>
-            </div>
-        </div>
-    </main>
-
-    <!-- Library Center Modal -->
-    <div class="modal-overlay" id="library-modal">
-        <div class="modal">
-            <h2>📚 Library Center</h2>
-            <div class="modal-body">
-                <button onclick="createSnapshot()" style="background:var(--accent);">📸 Create Backup Snapshot Now</button>
-                <button onclick="exportData()">💾 Export Full JSON Backup</button>
-                <hr style="border-color:#333;">
-                <label>Import JSON Backup:</label>
-                <input type="file" accept=".json" onchange="importData(event)">
-                <hr style="border-color:#333;">
-                <h3>Recovery Snapshots</h3>
-                <div class="snapshot-list" id="snapshot-list"></div>
-                <button onclick="closeLibrary()" style="margin-top:10px;">Close</button>
-            </div>
-        </div>
+      <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 25px 0;">
+      <a href="freeform://" class="pandora-btn" style="display:block; text-align:center; background:#fff; color:#000; font-size:16px;">Launch iPad Freeform App</a>
     </div>
+  </main>
 
-    <!-- Application Script -->
-    <script>
-        // --- INLINE SERVICE WORKER (PWA OFFLINE CACHING) ---
-        const swCode = `
-            const CACHE = 'pandora-v1';
-            self.addEventListener('install', e => {
-                e.waitUntil(caches.open(CACHE).then(c => c.addAll([
-                    '/',
-                    'https://unpkg.com/vis-network/standalone/umd/vis-network.min.js'
-                ])));
-                self.skipWaiting();
-            });
-            self.addEventListener('fetch', e => {
-                if (e.request.url.startsWith('freeform://')) return; // Ignore custom schemes
-                e.respondWith(
-                    caches.match(e.request).then(res => res || fetch(e.request).then(fetchRes => {
-                        return caches.open(CACHE).then(c => {
-                            if (e.request.url.startsWith('http')) c.put(e.request, fetchRes.clone());
-                            return fetchRes;
-                        });
-                    }))
-                );
-            });
-        `;
-        const blob = new Blob([swCode], { type: 'application/javascript' });
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(err => console.log("SW Error:", err));
+  <!-- =====================================================
+       MODULE 2 PLACEHOLDER (CHAPTER REVIEW & CANVAS)
+       ===================================================== -->
+  <main id="chapter-view" class="view-section">
+    <div style="padding:40px; text-align:center; color:var(--text-muted);">
+      <h2>Chapter Review Module Pending</h2>
+      <p>This section will be generated in Turn 3.</p>
+    </div>
+    <!-- MODULE 2: CHAPTER REVIEW & CANVAS GOES HERE -->
+  </main>
+
+  <!-- =====================================================
+       MODULE 3 PLACEHOLDER (CHARACTER MAP)
+       ===================================================== -->
+  <main id="map-view" class="view-section">
+    <div style="padding:40px; text-align:center; color:var(--text-muted);">
+      <h2>Character Map Module Pending</h2>
+      <p>This section will be generated in Turn 2.</p>
+    </div>
+    <!-- MODULE 3: CHARACTER MAP GOES HERE -->
+  </main>
+
+  <!-- =====================================================
+       FLASHCARD VIEW (EBBINGHAUS INTEGRATION)
+       ===================================================== -->
+  <main id="flashcard-view" class="view-section">
+    <div class="fc-wrapper">
+      <div class="fc-header">
+        <h1 id="app-title">Ebbinghaus Literature Studio</h1>
+        <p>Multi-Book Reader • SM-2 Date Engine & Neuroscience Interleaving</p>
+        <div id="retention-metric" class="metric-badge">Session Retention: N/A (Target: ~85%)</div>
+      </div>
+
+      <!-- Bookshelf -->
+      <div class="bookshelf-wrapper">
+        <div class="bookshelf-title">
+          <span>Bookshelf Collection</span>
+          <button class="fc-btn" style="padding: 4px 8px; font-size: 0.75rem;" onclick="openInterleaveModal()">Custom Multi-Book Selection</button>
+        </div>
+        <div class="bookshelf-grid" id="bookshelf"></div>
+      </div>
+
+      <!-- Leitner Boxes Bar (Now with DUE Counter) -->
+      <div class="leitner-bar">
+        <div class="box-card" style="border-color:var(--accent-color);"><div class="box-label">DUE</div><div class="box-count" id="due-count">0</div></div>
+        <div class="box-card"><div class="box-label">BOX 1</div><div class="box-count" id="b1-count">0</div></div>
+        <div class="box-card"><div class="box-label">BOX 2</div><div class="box-count" id="b2-count">0</div></div>
+        <div class="box-card"><div class="box-label">BOX 3</div><div class="box-count" id="b3-count">0</div></div>
+        <div class="box-card"><div class="box-label">BOX 4</div><div class="box-count" id="b4-count">0</div></div>
+        <div class="box-card"><div class="box-label">BOX 5</div><div class="box-count" id="b5-count">0</div></div>
+        <div class="box-card"><div class="box-label">MASTERED</div><div class="box-count" id="bm-count">0</div></div>
+      </div>
+
+      <!-- Controls Bar -->
+      <div class="controls-bar">
+        <div class="controls-group">
+          <select id="book-select" onchange="filterByBook(this.value)">
+            <option value="ALL">All Books Combined (Global Interleaved)</option>
+          </select>
+          <button class="fc-btn" id="btn-due-toggle" onclick="toggleDueFilter()" title="Filter cards where nextDueDate <= Now">📅 Due Cards Only</button>
+          <label class="toggle-label" title="Enforces active memory retrieval by pausing before showing answers">
+            <input type="checkbox" id="guard-toggle" onchange="toggleGuard(this.checked)"> <span>⏱️ 3s Delay Guard</span>
+          </label>
+        </div>
+        <div class="controls-group">
+          <button class="btn-action" onclick="openCardManager()">Manage Cards</button>
+        </div>
+      </div>
+
+      <!-- 3 Study Technique Tabs -->
+      <div class="technique-tabs">
+        <button class="tab-btn active" id="tab-feynman" onclick="setMode('feynman')">Feynman Technique</button>
+        <button class="tab-btn" id="tab-cloze" onclick="setMode('cloze')">Cloze Technique</button>
+        <button class="tab-btn" id="tab-standard" onclick="setMode('standard')">Standard Q&A</button>
+      </div>
+
+      <!-- Flashcard Card Display -->
+      <div class="card-container" id="fc-main-card">
+        <div>
+          <div class="card-meta">
+            <span id="card-book-title">NO CARDS LOADED</span>
+            <span id="card-due-status" style="color: var(--accent-color);">Due: Now</span>
+            <span id="card-counter">Q0/0</span>
+            <span id="card-box-label">-</span>
+          </div>
+
+          <div class="card-prompt" id="card-prompt">Please select a book and add cards to begin.</div>
+
+          <div id="prompt-image-box" class="prompt-image-container hidden">
+            <img id="prompt-img" class="prompt-image" src="" alt="Question Diagram or Visual Prompt">
+          </div>
+
+          <!-- Mode 1: Feynman -->
+          <div id="mode-feynman-panel">
+            <textarea id="feynman-input" class="fc-textarea" placeholder="Explain this concept in simple terms as if teaching someone else..."></textarea>
+            <button class="fc-btn reveal-btn" onclick="toggleAnswer()" style="width:100%;">Compare with Model Answer</button>
+          </div>
+
+          <!-- Mode 2: Cloze -->
+          <div id="mode-cloze-panel" class="hidden">
+            <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:10px;">Recall the missing target phrase, then reveal:</p>
+            <button class="fc-btn reveal-btn" onclick="toggleAnswer()" style="width:100%;">Reveal Blank Target</button>
+          </div>
+
+          <!-- Mode 3: Standard -->
+          <div id="mode-standard-panel" class="hidden">
+            <button class="fc-btn reveal-btn" onclick="toggleAnswer()" style="width:100%;">Show Model Answer</button>
+          </div>
+
+          <!-- Model Answer -->
+          <div id="model-answer" class="model-answer-box hidden"></div>
+        </div>
+
+        <!-- 4-Button Anki Rating Bar -->
+        <div id="anki-controls" class="hidden">
+          <div style="font-size: 0.7rem; text-align: center; color: var(--text-muted); margin-bottom: 6px; font-weight: bold; letter-spacing: 0.5px;">RATE YOUR RECALL (ANKI SM-2)</div>
+          <div class="anki-rating-bar">
+            <button class="btn-again" onclick="rateCard('again')">Again<br><small>(Reset Box 1)</small></button>
+            <button class="btn-hard" onclick="rateCard('hard')">Hard<br><small>(Stay in Box)</small></button>
+            <button class="btn-good" onclick="rateCard('good')">Good<br><small>(+1 Box)</small></button>
+            <button class="btn-easy" onclick="rateCard('easy')">Easy<br><small>(+2 Boxes)</small></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- =====================================================
+       MODALS & OVERLAYS
+       ===================================================== -->
+  
+  <!-- Book Edit/Create Modal (Pandora) -->
+  <div class="lib-modal" id="book-modal">
+    <div class="lib-modal-content">
+      <h3 style="color:var(--accent-color); margin-bottom:15px;" id="book-modal-title">Book Metadata</h3>
+      <div class="home-form-group">
+        <label>Book Title</label>
+        <input type="text" id="bm-title">
+      </div>
+      <div class="home-form-group">
+        <label>Gemini Notebook URL</label>
+        <input type="url" id="bm-url" placeholder="https://gemini.google.com/notebook/...">
+      </div>
+      <div class="home-form-group">
+        <label>Cover Image (Upload)</label>
+        <input type="file" accept="image/*" id="bm-cover-file">
+      </div>
+      <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
+        <button class="pandora-btn" onclick="document.getElementById('book-modal').style.display='none'">Cancel</button>
+        <button class="pandora-btn" style="background:var(--accent-color); color:#000;" onclick="saveBookMetadata()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Library Center / Recovery Modal (Pandora) -->
+  <div class="lib-modal" id="library-modal">
+    <div class="lib-modal-content">
+      <h3 style="color:var(--accent-color); margin-bottom:15px;">📚 Library Recovery Center</h3>
+      <button class="pandora-btn" style="width:100%; margin-bottom:10px; background:var(--accent-color); color:#000;" onclick="createSnapshot()">📸 Create Recovery Snapshot</button>
+      <button class="pandora-btn" style="width:100%; margin-bottom:10px;" onclick="downloadFullBackup()">💾 Download JSON Backup File</button>
+      <hr style="border-color:var(--border-color); margin: 15px 0;">
+      <label style="font-size:0.85rem; color:var(--text-muted);">Restore from JSON Backup File</label>
+      <input type="file" accept=".json" style="width:100%; margin: 10px 0;" onchange="restoreFromBackup(event)">
+      <div style="text-align:right; margin-top:15px;">
+        <button class="pandora-btn" onclick="document.getElementById('library-modal').style.display='none'">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card Manager Modal (Ebbinghaus) -->
+  <div id="card-manager-modal" class="fc-modal">
+    <div class="fc-modal-content">
+      <h3 style="margin-bottom: 10px; color: var(--accent-color);">Manage Cards</h3>
+      <div id="card-manager-list" style="max-height: 350px; overflow-y: auto; margin-bottom: 15px; border: 1px solid var(--border-color); border-radius: 6px;"></div>
+      <div style="display: flex; gap: 10px; justify-content: space-between;">
+        <button class="btn-action" onclick="openAddCardModal()">+ Add New Card</button>
+        <button class="fc-btn" onclick="document.getElementById('card-manager-modal').style.display='none'">Close Manager</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Card Modal (Ebbinghaus) -->
+  <div id="edit-card-modal" class="fc-modal">
+    <div class="fc-modal-content">
+      <h3 style="margin-bottom: 10px; color: var(--accent-color);" id="edit-modal-title">Edit Card</h3>
+      <input type="hidden" id="edit-card-id">
+      
+      <div style="margin-bottom: 10px;">
+        <label style="font-size: 0.8rem; color: var(--text-muted);">Book Title (Read Only - Bound to Folder)</label>
+        <input type="text" id="edit-card-book" class="fc-input" readonly>
+      </div>
+      <div style="margin-bottom: 10px;">
+        <label style="font-size: 0.8rem; color: var(--text-muted);">Question / Prompt</label>
+        <textarea id="edit-card-prompt" class="fc-textarea" style="height: 70px;"></textarea>
+      </div>
+      <div style="margin-bottom: 10px;">
+        <label style="font-size: 0.8rem; color: var(--text-muted);">Answer / Model Answer</label>
+        <textarea id="edit-card-answer" class="fc-textarea" style="height: 70px;"></textarea>
+      </div>
+      <div style="margin-bottom: 15px;">
+        <label style="font-size: 0.8rem; color: var(--text-muted);">Cloze Target (Optional)</label>
+        <input type="text" id="edit-card-cloze" class="fc-input" placeholder="Target keyword for cloze mode">
+      </div>
+      <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <button class="fc-btn" onclick="document.getElementById('edit-card-modal').style.display='none'">Cancel</button>
+        <button class="btn-action" onclick="saveCardEdit()">Save Card</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Multi-Book Interleave Modal -->
+  <div id="interleave-modal" class="fc-modal">
+    <div class="fc-modal-content">
+      <h3 style="margin-bottom: 10px; color: var(--accent-color);">Multi-Book Interleaving</h3>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px;">Select books to weave into a randomized session:</p>
+      <div id="interleave-checkboxes" style="display:flex; flex-direction:column; gap:8px; margin-bottom:15px; padding:10px; border:1px solid var(--border-color); border-radius:6px;"></div>
+      <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <button class="fc-btn" onclick="document.getElementById('interleave-modal').style.display='none'">Cancel</button>
+        <button class="btn-action" onclick="applyInterleavedSelection()">Start Session</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* =====================================================
+       1. INLINE SERVICE WORKER (PWA OFFLINE CACHING)
+       ===================================================== */
+    const swCode = `
+      const CACHE = 'pandora-v1';
+      self.addEventListener('install', e => {
+          e.waitUntil(caches.open(CACHE).then(c => c.addAll(['/'])));
+          self.skipWaiting();
+      });
+      self.addEventListener('fetch', e => {
+          if (e.request.url.startsWith('freeform://')) return;
+          e.respondWith(
+              caches.match(e.request).then(res => res || fetch(e.request).then(fetchRes => {
+                  return caches.open(CACHE).then(c => {
+                      if (e.request.url.startsWith('http')) c.put(e.request, fetchRes.clone());
+                      return fetchRes;
+                  });
+              }))
+          );
+      });
+    `;
+    const blob = new Blob([swCode], { type: 'application/javascript' });
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(err => console.log("SW Error:", err));
+    }
+
+    /* =====================================================
+       2. PANDORA GLOBAL STATE & BOOK ARCHITECTURE
+       ===================================================== */
+    let PandoraState = {
+      wallpaper: null,
+      activeBookId: null,
+      books: {} // Format: { id: { title, notebookUrl, coverImage, flashcards: [], nodes: [], edges: [], chapterText: "" } }
+    };
+    
+    // Ebbinghaus Shared Variables
+    let allCardsView = []; // Flattened array for Ebbinghaus engine mapping
+    let filteredCards = [];
+    let selectedBooks = []; 
+    let currentIndex = 0;
+    let currentMode = 'feynman';
+    let currentBookFilter = 'ALL';
+    let dueOnlyFilter = false;
+    let delayGuardActive = false;
+    let countdownTimer = null;
+
+    // Distinct Pastel Palettes per Book
+    const PASTEL_PALETTES = [
+      { bg: '#fdf2f8', border: '#f472b6', accent: '#db2777', text: '#831843' },
+      { bg: '#f0fdf4', border: '#4ade80', accent: '#16a34a', text: '#14532d' },
+      { bg: '#eff6ff', border: '#60a5fa', accent: '#2563eb', text: '#1e3a8a' },
+      { bg: '#fef3c7', border: '#fbbf24', accent: '#d97706', text: '#78350f' },
+      { bg: '#f5f3ff', border: '#a78bfa', accent: '#7c3aed', text: '#4c1d95' },
+      { bg: '#fff7ed', border: '#fb923c', accent: '#ea580c', text: '#7c2d12' }
+    ];
+
+    window.onload = function() {
+      // Load Pandora State (which supersedes old gemini_flashcards_v3)
+      const saved = localStorage.getItem('pandora_master_state');
+      if (saved) {
+        PandoraState = JSON.parse(saved);
+      }
+      
+      initNavigation();
+      refreshAppGlobalState();
+      
+      if (PandoraState.wallpaper) {
+        document.getElementById('home-view').style.backgroundImage = `url(${PandoraState.wallpaper})`;
+      }
+    };
+
+    function saveGlobalState() {
+      localStorage.setItem('pandora_master_state', JSON.stringify(PandoraState));
+      syncAllCardsView(); // Ensure flashcard engine arrays are updated
+    }
+
+    function initNavigation() {
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+          document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
+          e.target.classList.add('active');
+          document.getElementById(e.target.dataset.target).classList.add('active');
+          if (e.target.dataset.target === 'flashcard-view') applyFilter(); // Refresh cards on view
+        });
+      });
+    }
+
+    function refreshAppGlobalState() {
+      // 1. Update Home Select
+      const hSelect = document.getElementById('home-book-select');
+      hSelect.innerHTML = '<option value="">-- Select Active Book --</option>';
+      Object.values(PandoraState.books).forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.id; opt.textContent = b.title;
+        if (b.id === PandoraState.activeBookId) opt.selected = true;
+        hSelect.appendChild(opt);
+      });
+
+      // 2. Update Global Nav Links & Labels
+      const activeBook = PandoraState.books[PandoraState.activeBookId];
+      if (activeBook) {
+        document.getElementById('global-book-label').textContent = activeBook.title;
+        const glink = document.getElementById('global-gemini-link');
+        if (activeBook.notebookUrl) {
+          glink.href = activeBook.notebookUrl;
+          glink.classList.remove('hidden');
+        } else {
+          glink.classList.add('hidden');
         }
+      } else {
+        document.getElementById('global-book-label').textContent = "No Book Selected";
+        document.getElementById('global-gemini-link').classList.add('hidden');
+      }
 
-        // --- GLOBAL STATE & PROTOCOLS ---
-        let state = {
-            wallpaper: null,
-            activeBookId: null,
-            books: {} // Format: { id: { title, notebookUrl, chapterText, canvasData, nodes, edges, flashcards } }
+      syncAllCardsView();
+      updateBookshelf();
+      populateBookSelect();
+      applyFilter();
+    }
+
+    /* =====================================================
+       3. PANDORA BOOK CRUD LOGIC
+       ===================================================== */
+    let editingBookId = null;
+
+    function createNewBook() {
+      editingBookId = 'book_' + Date.now();
+      document.getElementById('book-modal-title').textContent = "Create New Book";
+      document.getElementById('bm-title').value = "";
+      document.getElementById('bm-url').value = "";
+      document.getElementById('bm-cover-file').value = "";
+      document.getElementById('book-modal').style.display = 'flex';
+    }
+
+    function editActiveBook() {
+      if (!PandoraState.activeBookId) return alert("Select a book first.");
+      editingBookId = PandoraState.activeBookId;
+      const b = PandoraState.books[editingBookId];
+      document.getElementById('book-modal-title').textContent = "Edit Book Metadata";
+      document.getElementById('bm-title').value = b.title;
+      document.getElementById('bm-url').value = b.notebookUrl || "";
+      document.getElementById('book-modal').style.display = 'flex';
+    }
+
+    function saveBookMetadata() {
+      const title = document.getElementById('bm-title').value.trim();
+      if (!title) return alert("Title required.");
+      const url = document.getElementById('bm-url').value;
+      const fileInput = document.getElementById('bm-cover-file');
+      
+      const saveToState = (coverData) => {
+        if (!PandoraState.books[editingBookId]) {
+          // New Book
+          PandoraState.books[editingBookId] = { id: editingBookId, title, notebookUrl: url, coverImage: coverData, flashcards: [], nodes: [], edges: [], chapterText: "" };
+        } else {
+          // Edit Book
+          PandoraState.books[editingBookId].title = title;
+          PandoraState.books[editingBookId].notebookUrl = url;
+          if (coverData) PandoraState.books[editingBookId].coverImage = coverData;
+        }
+        PandoraState.activeBookId = editingBookId;
+        saveGlobalState();
+        refreshAppGlobalState();
+        document.getElementById('book-modal').style.display = 'none';
+      };
+
+      if (fileInput.files && fileInput.files[0]) {
+        const reader = new FileReader();
+        reader.onload = e => saveToState(e.target.result);
+        reader.readAsDataURL(fileInput.files[0]);
+      } else {
+        saveToState(PandoraState.books[editingBookId] ? PandoraState.books[editingBookId].coverImage : null);
+      }
+    }
+
+    function deleteActiveBook() {
+      if (!PandoraState.activeBookId) return;
+      if (confirm(`Permanently delete "${PandoraState.books[PandoraState.activeBookId].title}" and all its data?`)) {
+        delete PandoraState.books[PandoraState.activeBookId];
+        PandoraState.activeBookId = null;
+        saveGlobalState();
+        refreshAppGlobalState();
+      }
+    }
+
+    function switchActiveBook() {
+      const id = document.getElementById('home-book-select').value;
+      if (id) {
+        PandoraState.activeBookId = id;
+        saveGlobalState();
+        refreshAppGlobalState();
+      }
+    }
+
+    function setGlobalWallpaper(e) {
+      if (e.target.files[0]) {
+        const r = new FileReader();
+        r.onload = event => {
+          PandoraState.wallpaper = event.target.result;
+          document.getElementById('home-view').style.backgroundImage = `url(${PandoraState.wallpaper})`;
+          saveGlobalState();
         };
+        r.readAsDataURL(e.target.files[0]);
+      }
+    }
 
-        // --- CORE INITIATION ---
-        window.onload = () => {
-            loadState();
-            initNavigation();
-            initCanvas();
-            renderBookSelector();
-            if (state.activeBookId) loadBook(state.activeBookId);
-            applyWallpaper();
-        };
+    // Library Center Modals
+    function openLibraryModal() { document.getElementById('library-modal').style.display = 'flex'; }
+    function createSnapshot() {
+      const snapId = 'pandora_snap_' + Date.now();
+      localStorage.setItem(snapId, JSON.stringify(PandoraState));
+      alert("Snapshot Created locally in browser storage.");
+    }
+    function downloadFullBackup() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(PandoraState));
+      const dl = document.createElement('a');
+      dl.setAttribute("href", dataStr);
+      dl.setAttribute("download", "pandoras_box_backup.json");
+      dl.click();
+    }
+    function restoreFromBackup(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        try { PandoraState = JSON.parse(e.target.result); saveGlobalState(); refreshAppGlobalState(); alert("Restored!"); document.getElementById('library-modal').style.display='none';} 
+        catch (err) { alert("Invalid file."); }
+      };
+      reader.readAsText(file);
+    }
 
-        // --- LIVE STATE LOCALSTORAGE SYNC ---
-        function triggerSave() {
-            if (!state.activeBookId) return;
-            const b = state.books[state.activeBookId];
-            b.chapterText = document.getElementById('chapter-text').innerHTML;
-            b.canvasData = canvas.toDataURL();
-            localStorage.setItem('pandora_box_state', JSON.stringify(state));
+    /* =====================================================
+       4. EBBINGHAUS FLASHCARD LOGIC (COMPLETED & INTEGRATED)
+       ===================================================== */
+    
+    // Syncs the PandoraState book dictionary into a flat array for the Ebbinghaus engine
+    function syncAllCardsView() {
+      allCardsView = [];
+      Object.values(PandoraState.books).forEach(book => {
+        if (book.flashcards) {
+          book.flashcards.forEach(c => { c.bookId = book.id; c.bookTitle = book.title; allCardsView.push(c); });
         }
+      });
+    }
 
-        function loadState() {
-            const saved = localStorage.getItem('pandora_box_state');
-            if (saved) state = JSON.parse(saved);
+    function getBookPalette(title) {
+      let hash = 0;
+      for (let i = 0; i < title.length; i++) hash = title.charCodeAt(i) + ((hash << 5) - hash);
+      return PASTEL_PALETTES[Math.abs(hash) % PASTEL_PALETTES.length];
+    }
+
+    function applyBookTheme(bookId) {
+      if (bookId === 'ALL' || bookId === 'MULTI') {
+        document.documentElement.style.setProperty('--accent-color', '#f59e0b');
+        document.documentElement.style.setProperty('--accent-glow', 'rgba(245, 158, 11, 0.25)');
+      } else {
+        const b = PandoraState.books[bookId];
+        if (b) {
+          const palette = getBookPalette(b.title);
+          document.documentElement.style.setProperty('--accent-color', palette.accent);
+          document.documentElement.style.setProperty('--accent-glow', `${palette.border}40`);
         }
+      }
+    }
 
-        // --- NAVIGATION & UI ---
-        function initNavigation() {
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-                    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-                    e.target.classList.add('active');
-                    const target = document.getElementById(e.target.dataset.target);
-                    target.classList.add('active');
-                    
-                    if (e.target.dataset.target === 'map-view' && network) network.redraw();
-                    if (e.target.dataset.target === 'flashcard-view') renderFlashcard();
-                });
-            });
+    function updateBookshelf() {
+      const shelf = document.getElementById('bookshelf');
+      shelf.innerHTML = '';
+      if (Object.keys(PandoraState.books).length === 0) {
+        shelf.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem; padding: 10px;">Bookshelf is empty. Go to Home to create a book.</div>';
+        return;
+      }
+
+      // All Books Tile
+      const allTile = document.createElement('div');
+      allTile.className = `book-tile ${currentBookFilter === 'ALL' ? 'active' : ''}`;
+      allTile.onclick = () => filterByBook('ALL');
+      allTile.innerHTML = `<div class="book-fallback" style="color:var(--text-main);">ALL BOOKS</div>`;
+      shelf.appendChild(allTile);
+
+      Object.values(PandoraState.books).forEach(b => {
+        const palette = getBookPalette(b.title);
+        const tile = document.createElement('div');
+        tile.className = `book-tile ${currentBookFilter === b.id ? 'active' : ''}`;
+        tile.style.backgroundColor = palette.bg; tile.style.borderColor = palette.border;
+        tile.onclick = () => filterByBook(b.id);
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.style.width = '100%'; contentDiv.style.height = '100%'; contentDiv.style.display = 'flex'; contentDiv.style.alignItems = 'center'; contentDiv.style.justifyContent = 'center';
+        if (b.coverImage) {
+          contentDiv.innerHTML = `<img src="${b.coverImage}">`;
+        } else {
+          contentDiv.innerHTML = `<div class="book-fallback" style="color:${palette.text};">${b.title}</div>`;
         }
+        tile.appendChild(contentDiv);
+        shelf.appendChild(tile);
+      });
+    }
 
-        function applyWallpaper() {
-            if (state.wallpaper) {
-                document.getElementById('home-view').style.backgroundImage = `url(${state.wallpaper})`;
-            }
-        }
+    function populateBookSelect() {
+      const select = document.getElementById('book-select');
+      select.innerHTML = '<option value="ALL">All Books Combined</option>';
+      if (selectedBooks.length > 0) select.innerHTML += `<option value="MULTI">Custom Interleaved</option>`;
+      Object.values(PandoraState.books).forEach(b => {
+        select.innerHTML += `<option value="${b.id}">${b.title}</option>`;
+      });
+      select.value = currentBookFilter;
+    }
 
-        function handleWallpaper(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                state.wallpaper = event.target.result;
-                applyWallpaper();
-                triggerSave();
-            };
-            reader.readAsDataURL(file);
-        }
+    function filterByBook(bookId) {
+      currentBookFilter = bookId;
+      document.getElementById('book-select').value = bookId;
+      applyBookTheme(bookId);
+      updateBookshelf();
+      applyFilter();
+    }
 
-        // --- BOOK MANAGEMENT ---
-        function createNewBook() {
-            createSnapshot(); // Auto-snapshot before major changes
-            const title = prompt("Enter Book Title:");
-            if (!title) return;
-            const notebookUrl = prompt("Enter Gemini Notebook URL for this book (optional):") || "#";
-            
-            const id = 'book_' + Date.now();
-            
-            // Generate 10 Default Nodes
-            const defaultNodes = Array.from({length: 10}, (_, i) => ({
-                id: i + 1, label: `Character ${i + 1}`, role: '', notes: ''
-            }));
-            const defaultEdges = Array.from({length: 9}, (_, i) => ({
-                from: 1, to: i + 2
-            }));
+    function interleaveArray(array) {
+      const copy = [...array];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
 
-            state.books[id] = {
-                title, notebookUrl, chapterText: '', canvasData: null,
-                nodes: defaultNodes, edges: defaultEdges, flashcards: []
-            };
-            
-            state.activeBookId = id;
-            renderBookSelector();
-            loadBook(id);
-            triggerSave();
-        }
+    function applyFilter() {
+      syncAllCardsView();
+      let baseList = [];
+      if (currentBookFilter === 'ALL') baseList = interleaveArray([...allCardsView]);
+      else if (currentBookFilter === 'MULTI') baseList = interleaveArray(allCardsView.filter(c => selectedBooks.includes(c.bookId)));
+      else baseList = allCardsView.filter(c => c.bookId === currentBookFilter);
 
-        function renderBookSelector() {
-            const sel = document.getElementById('book-selector');
-            sel.innerHTML = '<option value="">-- Select a Book --</option>';
-            Object.keys(state.books).forEach(id => {
-                const opt = document.createElement('option');
-                opt.value = id; opt.textContent = state.books[id].title;
-                if (id === state.activeBookId) opt.selected = true;
-                sel.appendChild(opt);
-            });
-        }
+      const now = new Date();
+      if (dueOnlyFilter) {
+        filteredCards = baseList.filter(c => (!c.nextDueDate) || new Date(c.nextDueDate) <= now);
+      } else {
+        filteredCards = baseList;
+      }
+      currentIndex = 0;
+      updateBoxCounts();
+      renderCard();
+    }
 
-        function switchBook() {
-            const sel = document.getElementById('book-selector');
-            if (sel.value) {
-                state.activeBookId = sel.value;
-                loadBook(sel.value);
-                triggerSave();
-            }
-        }
+    function updateBoxCounts() {
+      const now = new Date();
+      let b1=0, b2=0, b3=0, b4=0, b5=0, bm=0, due=0;
+      
+      let targetSet = currentBookFilter === 'ALL' ? allCardsView : (currentBookFilter === 'MULTI' ? allCardsView.filter(c => selectedBooks.includes(c.bookId)) : allCardsView.filter(c=>c.bookId === currentBookFilter));
+      
+      targetSet.forEach(c => {
+        if (c.box === 1) b1++; else if (c.box===2) b2++; else if (c.box===3) b3++; else if (c.box===4) b4++; else if (c.box===5) b5++; else bm++;
+        if ((!c.nextDueDate || new Date(c.nextDueDate) <= now) && c.box < 6) due++;
+      });
+      
+      document.getElementById('due-count').textContent = due;
+      document.getElementById('b1-count').textContent = b1; document.getElementById('b2-count').textContent = b2;
+      document.getElementById('b3-count').textContent = b3; document.getElementById('b4-count').textContent = b4;
+      document.getElementById('b5-count').textContent = b5; document.getElementById('bm-count').textContent = bm;
+    }
 
-        function loadBook(id) {
-            const b = state.books[id];
-            if (!b) return;
-            
-            document.getElementById('current-book-label').textContent = b.title;
-            
-            // Dynamic Gemini Links
-            document.querySelectorAll('.gemini-link').forEach(link => {
-                link.href = b.notebookUrl;
-                link.style.display = (b.notebookUrl && b.notebookUrl !== "#") ? 'inline-block' : 'none';
-            });
+    function toggleDueFilter() {
+      dueOnlyFilter = !dueOnlyFilter;
+      const btn = document.getElementById('btn-due-toggle');
+      if (dueOnlyFilter) { btn.classList.add('btn-toggle-active'); btn.textContent = "📅 Due Cards Only (Active)"; } 
+      else { btn.classList.remove('btn-toggle-active'); btn.textContent = "📅 Due Cards Only"; }
+      applyFilter();
+    }
 
-            // Chapter Review
-            document.getElementById('chapter-text').innerHTML = b.chapterText || '';
-            if (b.canvasData) {
-                const img = new Image();
-                img.onload = () => { ctx.clearRect(0,0, canvas.width, canvas.height); ctx.drawImage(img, 0, 0); };
-                img.src = b.canvasData;
-            } else {
-                ctx.clearRect(0,0, canvas.width, canvas.height);
-            }
+    function toggleGuard(checked) { delayGuardActive = checked; }
 
-            // Map
-            initMap(b.nodes, b.edges);
-            
-            // Flashcards
-            activeCardData = null;
-            renderFlashcard();
-        }
+    function setMode(mode) {
+      currentMode = mode;
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById(`tab-${mode}`).classList.add('active');
+      document.getElementById('mode-feynman-panel').classList.add('hidden');
+      document.getElementById('mode-cloze-panel').classList.add('hidden');
+      document.getElementById('mode-standard-panel').classList.add('hidden');
+      document.getElementById(`mode-${mode}-panel`).classList.remove('hidden');
+      document.getElementById('model-answer').classList.add('hidden');
+      document.getElementById('anki-controls').classList.add('hidden');
+      renderCard();
+    }
 
-        // --- APPLE PENCIL CANVAS ENGINE ---
-        const canvas = document.getElementById('drawing-canvas');
-        const ctx = canvas.getContext('2d');
-        let isDrawing = false, currentTool = 'pen';
+    function renderCard() {
+      const total = filteredCards.length;
+      document.getElementById('card-counter').textContent = `Q${total > 0 ? currentIndex + 1 : 0}/${total}`;
+      
+      document.getElementById('model-answer').classList.add('hidden');
+      document.getElementById('anki-controls').classList.add('hidden');
+      
+      // Reset reveal buttons
+      document.querySelectorAll('.reveal-btn').forEach(btn => {
+        btn.disabled = false;
+        btn.textContent = (currentMode==='feynman')?"Compare with Model Answer" : (currentMode==='cloze')?"Reveal Blank Target":"Show Model Answer";
+      });
+      clearInterval(countdownTimer);
 
-        function initCanvas() {
-            // Resize handler
-            const resize = () => {
-                const temp = canvas.toDataURL();
-                canvas.width = canvas.parentElement.clientWidth;
-                canvas.height = canvas.parentElement.clientHeight - 50; // minus toolbar
-                const img = new Image();
-                img.onload = () => ctx.drawImage(img, 0, 0);
-                img.src = temp;
-            };
-            window.addEventListener('resize', resize);
-            setTimeout(resize, 100);
+      if (total === 0) {
+        document.getElementById('card-prompt').textContent = dueOnlyFilter ? "No cards currently due!" : "No cards available.";
+        document.getElementById('card-book-title').textContent = "NO CARDS LOADED";
+        document.getElementById('card-box-label').textContent = "-";
+        return;
+      }
 
-            // Pointer Events for Apple Pencil Pressure
-            canvas.addEventListener('pointerdown', e => {
-                isDrawing = true;
-                ctx.beginPath();
-                ctx.moveTo(e.offsetX, e.offsetY);
-                e.preventDefault();
-            });
+      const card = filteredCards[currentIndex];
+      document.getElementById('card-book-title').textContent = card.bookTitle.toUpperCase();
+      document.getElementById('card-box-label').textContent = `LEITNER BOX ${card.box || 1}`;
+      
+      const now = new Date();
+      const dueDate = card.nextDueDate ? new Date(card.nextDueDate) : now;
+      if (dueDate <= now) {
+        document.getElementById('card-due-status').textContent = "Status: Due Now";
+        document.getElementById('card-due-status').style.color = "#16a34a";
+      } else {
+        document.getElementById('card-due-status').textContent = `Due: ${dueDate.toLocaleDateString(undefined, {month:'short', day:'numeric'})}`;
+        document.getElementById('card-due-status').style.color = "var(--text-muted)";
+      }
 
-            canvas.addEventListener('pointermove', e => {
-                if (!isDrawing) return;
-                const baseWidth = document.getElementById('pen-width').value;
-                const pressure = e.pressure !== 0.5 ? e.pressure : 1; // Apple pencil pressure
-                ctx.lineWidth = baseWidth * pressure * 2;
-                ctx.lineCap = 'round';
-                
-                if (currentTool === 'eraser') {
-                    ctx.globalCompositeOperation = 'destination-out';
-                    ctx.strokeStyle = "rgba(0,0,0,1)";
-                } else {
-                    ctx.globalCompositeOperation = 'source-over';
-                    ctx.strokeStyle = document.getElementById('pen-color').value;
-                }
-                
-                ctx.lineTo(e.offsetX, e.offsetY);
-                ctx.stroke();
-                e.preventDefault();
-            });
+      if (currentMode === 'cloze' && card.clozeTarget) {
+        const clozePrompt = card.answer.replace(new RegExp(card.clozeTarget, 'gi'), `<span class="cloze-target">[ ${card.clozeTarget.length} letters ]</span>`);
+        document.getElementById('card-prompt').innerHTML = `<strong>Context:</strong> ${card.prompt}<br><br><strong>Challenge:</strong> ${clozePrompt}`;
+      } else {
+        document.getElementById('card-prompt').textContent = card.prompt;
+      }
+    }
 
-            canvas.addEventListener('pointerup', () => { isDrawing = false; triggerSave(); });
-            canvas.addEventListener('pointerout', () => { isDrawing = false; });
-        }
+    // COMPLETING THE TRUNCATED LOGIC: Delay Guard & Reveal
+    function toggleAnswer() {
+      const card = filteredCards[currentIndex];
+      if (!card) return;
+      const ansBox = document.getElementById('model-answer');
+      const revealBtns = document.querySelectorAll('.reveal-btn');
+      
+      if (delayGuardActive && ansBox.classList.contains('hidden')) {
+        let count = 3;
+        revealBtns.forEach(btn => { btn.disabled = true; btn.textContent = `Wait... ${count}s`; });
+        countdownTimer = setInterval(() => {
+          count--;
+          revealBtns.forEach(btn => btn.textContent = `Wait... ${count}s`);
+          if (count <= 0) {
+            clearInterval(countdownTimer);
+            revealBtns.forEach(btn => btn.style.display = 'none'); // hide button after reveal
+            showAnswerLogic(card, ansBox);
+          }
+        }, 1000);
+      } else {
+        revealBtns.forEach(btn => btn.style.display = 'none');
+        showAnswerLogic(card, ansBox);
+      }
+    }
 
-        function setTool(tool) {
-            currentTool = tool;
-            document.getElementById('tool-pen').classList.toggle('active', tool === 'pen');
-            document.getElementById('tool-eraser').classList.toggle('active', tool === 'eraser');
-        }
-        function clearCanvas() {
-            ctx.clearRect(0,0, canvas.width, canvas.height);
-            triggerSave();
-        }
+    function showAnswerLogic(card, ansBox) {
+      if(currentMode === 'cloze') {
+         ansBox.innerHTML = `<strong>Full Target:</strong> ${card.clozeTarget || card.answer}`;
+      } else {
+         ansBox.innerHTML = card.answer.replace(/\n/g, '<br>');
+      }
+      ansBox.classList.remove('hidden');
+      document.getElementById('anki-controls').classList.remove('hidden');
+      
+      // Card Flip CSS Effect Trigger
+      document.getElementById('fc-main-card').style.transform = "rotateX(360deg)";
+      setTimeout(()=> document.getElementById('fc-main-card').style.transform = "none", 400);
+    }
 
-        // --- VIS NETWORK CHARACTER MAP ---
-        let network = null;
-        let nodesDataset, edgesDataset;
+    // COMPLETING THE TRUNCATED LOGIC: SM-2 Calculations
+    function rateCard(quality) {
+      const card = filteredCards[currentIndex];
+      if (!card) return;
+      
+      if (!card.repetition) card.repetition = 0;
+      if (!card.interval) card.interval = 1;
+      if (!card.easeFactor) card.easeFactor = 2.5;
 
-        function initMap(nodeData, edgeData) {
-            nodesDataset = new vis.DataSet(nodeData);
-            edgesDataset = new vis.DataSet(edgeData);
-            const container = document.getElementById('network-canvas');
-            const data = { nodes: nodesDataset, edges: edgesDataset };
-            const options = {
-                nodes: { shape: 'dot', size: 20, font: { color: '#ffffff' }, color: { background: 'var(--accent)', border: '#ffffff' } },
-                edges: { width: 2, color: '#888' },
-                physics: { stabilization: false, barnesHut: { springLength: 200 } }
-            };
-            
-            if (network) network.destroy();
-            network = new vis.Network(container, data, options);
+      let qVal = 0;
+      if (quality === 'again') { qVal = 0; card.repetition = 0; card.interval = 1; card.box = 1; }
+      else if (quality === 'hard') { qVal = 3; card.interval = card.interval * 1.2; }
+      else if (quality === 'good') { qVal = 4; card.repetition++; card.interval = (card.repetition === 1) ? 1 : (card.repetition === 2) ? 6 : card.interval * card.easeFactor; card.box = Math.min(card.box + 1, 6); }
+      else if (quality === 'easy') { qVal = 5; card.repetition++; card.interval = (card.repetition === 1) ? 4 : card.interval * card.easeFactor * 1.3; card.box = Math.min(card.box + 2, 6); }
 
-            // Sidebar binding
-            network.on("selectNode", function (params) {
-                const nodeId = params.nodes[0];
-                const node = nodesDataset.get(nodeId);
-                document.getElementById('node-id').value = node.id;
-                document.getElementById('node-label').value = node.label || '';
-                document.getElementById('node-role').value = node.role || '';
-                document.getElementById('node-notes').value = node.notes || '';
-            });
-            network.on("deselectNode", function () {
-                document.getElementById('node-id').value = '';
-                document.getElementById('node-label').value = '';
-                document.getElementById('node-role').value = '';
-                document.getElementById('node-notes').value = '';
-            });
+      card.easeFactor = card.easeFactor + (0.1 - (5 - qVal) * (0.08 + (5 - qVal) * 0.02));
+      if (card.easeFactor < 1.3) card.easeFactor = 1.3;
+      
+      card.interval = Math.round(card.interval);
+      card.nextDueDate = new Date(Date.now() + card.interval * 24 * 60 * 60 * 1000).toISOString();
 
-            // Save map positions on drag end
-            network.on("dragEnd", () => {
-                saveMapState();
-            });
-        }
+      // Find in PandoraState and update
+      const bIndex = PandoraState.books[card.bookId].flashcards.findIndex(c => c.id === card.id);
+      if (bIndex > -1) {
+        PandoraState.books[card.bookId].flashcards[bIndex] = card;
+      }
+      saveGlobalState();
 
-        function updateNodeUI() {
-            const id = document.getElementById('node-id').value;
-            if (!id) return;
-            nodesDataset.update({
-                id: parseInt(id),
-                label: document.getElementById('node-label').value,
-                role: document.getElementById('node-role').value,
-                notes: document.getElementById('node-notes').value
-            });
-        }
+      // Move Next
+      document.querySelectorAll('.reveal-btn').forEach(btn => btn.style.display = 'block'); // reset buttons
+      if (currentIndex < filteredCards.length - 1) {
+        currentIndex++;
+        renderCard();
+      } else {
+        applyFilter(); // reload queue
+      }
+    }
 
-        function saveNodeData() {
-            saveMapState();
-            alert("Character saved!");
-        }
+    // CARD MANAGER MODAL
+    function openCardManager() {
+      const list = document.getElementById('card-manager-list');
+      list.innerHTML = '';
+      syncAllCardsView();
+      let targets = currentBookFilter === 'ALL' ? allCardsView : allCardsView.filter(c => c.bookId === currentBookFilter);
+      targets.forEach(c => {
+        list.innerHTML += `
+          <div style="padding:10px; border-bottom:1px solid var(--border-color); font-size:0.85rem; display:flex; justify-content:space-between;">
+            <div><strong>${c.bookTitle}:</strong> ${c.prompt.substring(0,30)}...</div>
+            <div>
+              <button onclick="editCard('${c.bookId}', '${c.id}')" style="background:#0A84FF; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Edit</button>
+              <button onclick="deleteCard('${c.bookId}', '${c.id}')" style="background:#dc2626; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Del</button>
+            </div>
+          </div>`;
+      });
+      document.getElementById('card-manager-modal').style.display = 'flex';
+    }
 
-        function saveMapState() {
-            if (!state.activeBookId) return;
-            state.books[state.activeBookId].nodes = nodesDataset.get();
-            state.books[state.activeBookId].edges = edgesDataset.get();
-            triggerSave();
-        }
+    let editingFcId = null;
+    let editingFcBookId = null;
+    function openAddCardModal() {
+      if (currentBookFilter === 'ALL' || currentBookFilter === 'MULTI') {
+        alert("Please select a specific book from the dropdown first to add a card to it.");
+        return;
+      }
+      editingFcId = 'fc_' + Date.now();
+      editingFcBookId = currentBookFilter;
+      document.getElementById('edit-modal-title').textContent = "Add New Card";
+      document.getElementById('edit-card-book').value = PandoraState.books[editingFcBookId].title;
+      document.getElementById('edit-card-prompt').value = "";
+      document.getElementById('edit-card-answer').value = "";
+      document.getElementById('edit-card-cloze').value = "";
+      document.getElementById('card-manager-modal').style.display = 'none';
+      document.getElementById('edit-card-modal').style.display = 'flex';
+    }
 
-        // --- EBBINGHAUS FLASHCARD ENGINE (SM-2) ---
-        let activeCardData = null;
-        let isFlipped = false;
+    function editCard(bookId, cardId) {
+      editingFcBookId = bookId;
+      editingFcId = cardId;
+      const c = PandoraState.books[bookId].flashcards.find(x => x.id === cardId);
+      if (!c) return;
+      document.getElementById('edit-modal-title').textContent = "Edit Card";
+      document.getElementById('edit-card-book').value = PandoraState.books[bookId].title;
+      document.getElementById('edit-card-prompt').value = c.prompt;
+      document.getElementById('edit-card-answer').value = c.answer;
+      document.getElementById('edit-card-cloze').value = c.clozeTarget || "";
+      document.getElementById('card-manager-modal').style.display = 'none';
+      document.getElementById('edit-card-modal').style.display = 'flex';
+    }
 
-        function addFlashcard() {
-            if (!state.activeBookId) return alert("Select a book first.");
-            const front = prompt("Card Front (Question/Concept):");
-            if (!front) return;
-            const back = prompt("Card Back (Answer):");
-            if (!back) return;
-            
-            const card = {
-                id: Date.now(),
-                front, back,
-                box: 1, // Leitner box (1-5, 6=Mastered)
-                interval: 0, 
-                repetition: 0, 
-                easeFactor: 2.5,
-                dueDate: Date.now()
-            };
-            state.books[state.activeBookId].flashcards.push(card);
-            triggerSave();
-            renderFlashcard();
-        }
+    function saveCardEdit() {
+      const prompt = document.getElementById('edit-card-prompt').value.trim();
+      const answer = document.getElementById('edit-card-answer').value.trim();
+      if (!prompt || !answer) return alert("Prompt and answer required.");
+      
+      const cloze = document.getElementById('edit-card-cloze').value.trim();
+      const targetArr = PandoraState.books[editingFcBookId].flashcards;
+      const existingIdx = targetArr.findIndex(c => c.id === editingFcId);
+      
+      if (existingIdx > -1) {
+        targetArr[existingIdx].prompt = prompt; targetArr[existingIdx].answer = answer; targetArr[existingIdx].clozeTarget = cloze;
+      } else {
+        targetArr.push({ id: editingFcId, prompt, answer, clozeTarget: cloze, box: 1, interval: 1, easeFactor: 2.5, repetition: 0, nextDueDate: new Date().toISOString() });
+      }
+      
+      saveGlobalState();
+      document.getElementById('edit-card-modal').style.display = 'none';
+      applyFilter();
+    }
 
-        function calculateSM2(quality, card) {
-            // quality: 1 (Hard/Fail), 2 (Good), 3 (Easy)
-            if (quality === 1) {
-                card.repetition = 0;
-                card.interval = 1;
-                card.box = 1;
-            } else {
-                if (card.repetition === 0) card.interval = 1;
-                else if (card.repetition === 1) card.interval = 6;
-                else card.interval = Math.round(card.interval * card.easeFactor);
-                
-                card.repetition += 1;
-                card.box = Math.min(card.box + 1, 6);
-            }
-            
-            // Adjust ease factor
-            const qSM2 = quality === 1 ? 0 : quality === 2 ? 3 : 5; // map to SM2 0-5 scale roughly
-            card.easeFactor = card.easeFactor + (0.1 - (5 - qSM2) * (0.08 + (5 - qSM2) * 0.02));
-            if (card.easeFactor < 1.3) card.easeFactor = 1.3;
-            
-            // Set next due date (interval in days -> ms)
-            card.dueDate = Date.now() + (card.interval * 24 * 60 * 60 * 1000);
-            return card;
-        }
+    function deleteCard(bookId, cardId) {
+      if(confirm("Delete this card?")) {
+        PandoraState.books[bookId].flashcards = PandoraState.books[bookId].flashcards.filter(c => c.id !== cardId);
+        saveGlobalState();
+        openCardManager(); // refresh list
+      }
+    }
 
-        function renderFlashcard() {
-            if (!state.activeBookId) return;
-            const cards = state.books[state.activeBookId].flashcards || [];
-            
-            // Update Stats
-            const now = Date.now();
-            let dueCount = 0, b1=0, b2=0, b3=0, mastered=0;
-            
-            cards.forEach(c => {
-                if (c.dueDate <= now && c.box < 6) dueCount++;
-                if (c.box === 1) b1++;
-                else if (c.box === 2) b2++;
-                else if (c.box === 3) b3++;
-                else if (c.box >= 6) mastered++;
-            });
-            
-            document.getElementById('stat-due').textContent = dueCount;
-            document.getElementById('stat-b1').textContent = b1;
-            document.getElementById('stat-b2').textContent = b2;
-            document.getElementById('stat-b3').textContent = b3;
-            document.getElementById('stat-mastered').textContent = mastered;
-
-            // Get Next Due Card
-            const dueCards = cards.filter(c => c.dueDate <= now && c.box < 6).sort((a,b) => a.dueDate - b.dueDate);
-            
-            isFlipped = false;
-            document.getElementById('card-controls').style.display = 'none';
-            const display = document.getElementById('card-content');
-            
-            if (dueCards.length > 0) {
-                activeCardData = dueCards[0];
-                
-                // Handle Study Modes
-                const mode = document.getElementById('study-mode').value;
-                if (mode === 'cloze' && activeCardData.front.includes('...')) {
-                    display.innerHTML = `<i>Fill in the blank:</i><br><br>${activeCardData.front}`;
-                } else if (mode === 'feynman') {
-                    display.innerHTML = `<i>Explain this simply:</i><br><br><b>${activeCardData.front}</b>`;
-                } else {
-                    display.innerHTML = activeCardData.front;
-                }
-            } else {
-                activeCardData = null;
-                display.innerHTML = "🎉 No due cards! You're all caught up.";
-            }
-        }
-
-        function flipCard() {
-            if (!activeCardData || isFlipped) return;
-            isFlipped = true;
-            document.getElementById('card-content').innerHTML = `
-                <div style="font-size:16px; color:#aaa; margin-bottom:15px;">${activeCardData.front}</div>
-                <hr style="border:0; height:1px; background:var(--border); margin:15px 0; width:100%;">
-                <div>${activeCardData.back}</div>
-            `;
-            document.getElementById('card-controls').style.display = 'flex';
-        }
-
-        function gradeCard(quality) {
-            if (!activeCardData) return;
-            calculateSM2(quality, activeCardData);
-            triggerSave();
-            renderFlashcard();
-        }
-
-        // --- DISASTER RECOVERY & LIBRARY CENTER ---
-        function openLibrary() {
-            document.getElementById('library-modal').style.display = 'flex';
-            renderSnapshots();
-        }
-        function closeLibrary() {
-            document.getElementById('library-modal').style.display = 'none';
-        }
-
-        function createSnapshot() {
-            const timestamp = new Date().toLocaleString();
-            const snapId = 'pandora_snapshot_' + Date.now();
-            localStorage.setItem(snapId, JSON.stringify({ time: timestamp, data: state }));
-            alert("Snapshot created: " + timestamp);
-            renderSnapshots();
-        }
-
-        function renderSnapshots() {
-            const list = document.getElementById('snapshot-list');
-            list.innerHTML = '';
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key.startsWith('pandora_snapshot_')) {
-                    const snap = JSON.parse(localStorage.getItem(key));
-                    list.innerHTML += `
-                        <div class="snapshot-item">
-                            <span>${snap.time}</span>
-                            <button onclick="restoreSnapshot('${key}')">Restore</button>
-                        </div>
-                    `;
-                }
-            }
-        }
-
-        function restoreSnapshot(key) {
-            if (confirm("WARNING: This will overwrite your current live state. Proceed?")) {
-                const snap = JSON.parse(localStorage.getItem(key));
-                state = snap.data;
-                triggerSave();
-                window.location.reload();
-            }
-        }
-
-        function exportData() {
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state));
-            const dlAnchorElem = document.createElement('a');
-            dlAnchorElem.setAttribute("href", dataStr);
-            dlAnchorElem.setAttribute("download", "pandoras_box_backup.json");
-            dlAnchorElem.click();
-        }
-
-        function importData(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            if (confirm("Importing will overwrite your current state. Did you take a snapshot first?")) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    try {
-                        state = JSON.parse(e.target.result);
-                        triggerSave();
-                        alert("Import successful! Reloading...");
-                        window.location.reload();
-                    } catch (err) {
-                        alert("Invalid JSON file.");
-                    }
-                };
-                reader.readAsText(file);
-            }
-        }
-    </script>
+    // Interleave Modal
+    function openInterleaveModal() {
+      const div = document.getElementById('interleave-checkboxes');
+      div.innerHTML = '';
+      Object.values(PandoraState.books).forEach(b => {
+        const checked = selectedBooks.includes(b.id) ? "checked" : "";
+        div.innerHTML += `<label><input type="checkbox" value="${b.id}" ${checked}> ${b.title}</label>`;
+      });
+      document.getElementById('interleave-modal').style.display = 'flex';
+    }
+    
+    function applyInterleavedSelection() {
+      selectedBooks = Array.from(document.querySelectorAll('#interleave-checkboxes input:checked')).map(cb => cb.value);
+      if (selectedBooks.length > 0) filterByBook('MULTI');
+      document.getElementById('interleave-modal').style.display = 'none';
+    }
+  </script>
 </body>
 </html>
