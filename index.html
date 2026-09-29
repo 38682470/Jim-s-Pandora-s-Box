@@ -176,11 +176,393 @@
        MODULE 3 PLACEHOLDER (CHARACTER MAP)
        ===================================================== -->
   <main id="map-view" class="view-section">
-    <div style="padding:40px; text-align:center; color:var(--text-muted);">
-      <h2>Character Map Module Pending</h2>
-      <p>This section will be generated in Turn 2.</p>
+    <!-- =====================================================
+         CHARACTER MAP MODULE (HIGH-FIDELITY)
+         ===================================================== -->
+    
+    <!-- Vis.js Graph Engine CDN -->
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+
+    <style>
+      /* Character Map Layout */
+      .cmap-container { display: flex; height: 100%; width: 100%; background: var(--bg-main); overflow: hidden; }
+      .cmap-main { flex: 1; display: flex; flex-direction: column; position: relative; }
+      .cmap-sidebar { width: 340px; background: var(--bg-card); border-left: 1px solid var(--border-color); display: flex; flex-direction: column; box-shadow: -5px 0 20px rgba(0,0,0,0.5); z-index: 10; transition: transform 0.3s ease; }
+      
+      /* Network Canvas */
+      #network-canvas { flex: 1; width: 100%; outline: none; }
+      
+      /* Physics Controls Toolbar */
+      .cmap-toolbar { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border-color); padding: 10px 15px; display: flex; gap: 15px; align-items: center; z-index: 5; }
+      .cmap-toolbar label { font-size: 0.75rem; color: var(--text-muted); font-weight: bold; display: flex; align-items: center; gap: 8px; }
+      .cmap-toolbar input[type="range"] { accent-color: var(--accent-color); cursor: pointer; }
+      
+      /* Sidebar Internals */
+      .sidebar-header { padding: 15px; border-bottom: 1px solid var(--border-color); background: var(--bg-inner); display: flex; justify-content: space-between; align-items: center; }
+      .sidebar-header h3 { color: var(--accent-color); font-size: 1.1rem; }
+      .sidebar-content { padding: 15px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 12px; }
+      
+      .cmap-form-group label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; font-weight: bold; }
+      .cmap-input, .cmap-select, .cmap-textarea { width: 100%; background: var(--bg-inner); border: 1px solid var(--border-color); color: var(--text-main); padding: 10px; border-radius: 6px; font-size: 0.9rem; font-family: inherit; }
+      .cmap-textarea { height: 90px; resize: vertical; }
+      
+      .faction-indicator { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: middle; }
+      
+      /* Edge Creation Mode Indicator */
+      .edge-mode-banner { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: #3b82f6; color: #fff; padding: 6px 16px; border-radius: 20px; font-weight: bold; font-size: 0.85rem; box-shadow: 0 4px 12px rgba(0,0,0,0.4); display: none; z-index: 10; pointer-events: none; }
+      
+      /* Placeholder State */
+      #cmap-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; width: 100%; color: var(--text-muted); text-align: center; padding: 40px; }
+    </style>
+
+    <div id="cmap-placeholder">
+      <h2 style="color:var(--text-muted); margin-bottom:10px;">Character Map Inactive</h2>
+      <p>Please select an active book from the Home tab to render its relationship engine.</p>
     </div>
-    <!-- MODULE 3: CHARACTER MAP GOES HERE -->
+
+    <div id="cmap-active-layout" class="cmap-container" style="display: none;">
+      
+      <div class="cmap-main">
+        <div class="edge-mode-banner" id="edge-banner">🔗 Edge Mode: Click target node to connect...</div>
+        
+        <!-- Top Physics & Tool Bar -->
+        <div class="cmap-toolbar">
+          <button class="pandora-btn" style="background:var(--accent-color); color:#000;" onclick="addNewCharacter()">+ New Character</button>
+          <button class="pandora-btn" id="btn-link-mode" onclick="toggleEdgeMode()">🔗 Add Link</button>
+          <div class="flex-spacer"></div>
+          <label title="Adjust relationship spring distance">Springs: 
+            <input type="range" id="phys-springs" min="50" max="400" value="200" oninput="updatePhysics()">
+          </label>
+          <label title="Adjust node repulsion force">Gravity: 
+            <input type="range" id="phys-gravity" min="-5000" max="-500" value="-2500" oninput="updatePhysics()">
+          </label>
+        </div>
+
+        <!-- Render Target -->
+        <div id="network-canvas"></div>
+      </div>
+
+      <!-- Right Hand Node Detail Sidebar -->
+      <div class="cmap-sidebar" id="node-sidebar">
+        <div class="sidebar-header">
+          <h3 id="sidebar-title">Character Details</h3>
+          <span id="sidebar-id" style="font-size:0.7rem; color:var(--text-muted);"></span>
+        </div>
+        <div class="sidebar-content">
+          <input type="hidden" id="node-id">
+          
+          <div class="cmap-form-group">
+            <label>Name</label>
+            <input type="text" id="node-label" class="cmap-input" placeholder="Character Name">
+          </div>
+          
+          <div class="cmap-form-group">
+            <label>Role / Title</label>
+            <input type="text" id="node-title" class="cmap-input" placeholder="e.g. Antagonist, Inspector">
+          </div>
+          
+          <div class="cmap-form-group">
+            <label>Faction / Color</label>
+            <select id="node-group" class="cmap-select">
+              <option value="protagonist">🟦 Protagonist (Blue)</option>
+              <option value="antagonist">🟥 Antagonist (Red)</option>
+              <option value="supporting">🟩 Supporting (Green)</option>
+              <option value="neutral">🟨 Neutral (Amber)</option>
+              <option value="location">🟪 Location/Object (Purple)</option>
+            </select>
+          </div>
+
+          <div class="cmap-form-group">
+            <label>Importance (Size): <span id="node-size-val">30</span></label>
+            <input type="range" id="node-size" min="15" max="60" value="30" class="cmap-input" style="padding:0; height:auto;" oninput="document.getElementById('node-size-val').innerText = this.value;">
+          </div>
+
+          <div class="cmap-form-group">
+            <label>Avatar Image URL (Optional)</label>
+            <input type="url" id="node-image" class="cmap-input" placeholder="https://...">
+          </div>
+
+          <div class="cmap-form-group">
+            <label>Dossier / Notes</label>
+            <textarea id="node-notes" class="cmap-textarea" placeholder="Character motivations, history, analysis..."></textarea>
+          </div>
+
+          <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+            <button class="pandora-btn" style="background:var(--accent-color); color:#000;" onclick="saveSelectedNode()">💾 Save Character</button>
+            <button class="pandora-btn" style="background:transparent; border-color:#dc2626; color:#ef4444;" onclick="deleteSelectedElement()">🗑️ Delete Selected</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let network = null;
+      let nodesDataset = null;
+      let edgesDataset = null;
+      let isEdgeMode = false;
+      let edgeSourceNode = null;
+      
+      const FactionColors = {
+        protagonist: { border: '#2563eb', background: '#1e3a8a', highlight: { border: '#60a5fa', background: '#1e3a8a' } },
+        antagonist: { border: '#dc2626', background: '#7f1d1d', highlight: { border: '#f87171', background: '#7f1d1d' } },
+        supporting: { border: '#16a34a', background: '#14532d', highlight: { border: '#4ade80', background: '#14532d' } },
+        neutral: { border: '#d97706', background: '#78350f', highlight: { border: '#fbbf24', background: '#78350f' } },
+        location: { border: '#7c3aed', background: '#4c1d95', highlight: { border: '#a78bfa', background: '#4c1d95' } },
+        default: { border: '#f59e0b', background: '#1e293b' }
+      };
+
+      // Ensure map re-renders correctly when tab is clicked
+      document.querySelector('[data-target="map-view"]').addEventListener('click', () => {
+        setTimeout(() => renderCharacterMap(), 50);
+      });
+
+      function renderCharacterMap() {
+        const activeId = PandoraState.activeBookId;
+        const layout = document.getElementById('cmap-active-layout');
+        const placeholder = document.getElementById('cmap-placeholder');
+
+        if (!activeId) {
+          layout.style.display = 'none';
+          placeholder.style.display = 'flex';
+          return;
+        }
+
+        layout.style.display = 'flex';
+        placeholder.style.display = 'none';
+
+        const book = PandoraState.books[activeId];
+        
+        // Ensure arrays exist
+        if (!book.nodes) book.nodes = [];
+        if (!book.edges) book.edges = [];
+
+        // Initialize vis datasets
+        nodesDataset = new vis.DataSet(book.nodes);
+        edgesDataset = new vis.DataSet(book.edges);
+
+        const container = document.getElementById('network-canvas');
+        const data = { nodes: nodesDataset, edges: edgesDataset };
+
+        const options = {
+          nodes: {
+            shape: 'dot',
+            borderWidth: 3,
+            borderWidthSelected: 5,
+            font: { color: '#f8fafc', size: 14, face: '-apple-system', strokeWidth: 3, strokeColor: '#0f172a' },
+            shadow: { enabled: true, color: 'rgba(0,0,0,0.6)', size: 10, x: 5, y: 5 }
+          },
+          edges: {
+            width: 2,
+            selectionWidth: 3,
+            color: { color: '#64748b', highlight: '#f59e0b' },
+            font: { color: '#94a3b8', size: 12, strokeWidth: 2, strokeColor: '#0f172a', align: 'top' },
+            smooth: { type: 'continuous' },
+            arrows: { to: { enabled: true, scaleFactor: 0.5 } }
+          },
+          physics: {
+            enabled: true,
+            stabilization: false, // Ensures continuous fluid motion
+            barnesHut: {
+              gravitationalConstant: parseInt(document.getElementById('phys-gravity').value),
+              centralGravity: 0.15,
+              springLength: parseInt(document.getElementById('phys-springs').value),
+              springConstant: 0.04,
+              damping: 0.09
+            }
+          },
+          interaction: { hover: true, tooltipDelay: 200 }
+        };
+
+        if (network) {
+          network.destroy();
+        }
+        network = new vis.Network(container, data, options);
+
+        // Event Listeners
+        network.on("selectNode", function (params) {
+          if (isEdgeMode) {
+            handleEdgeCreation(params.nodes[0]);
+          } else {
+            populateSidebarNode(params.nodes[0]);
+          }
+        });
+
+        network.on("selectEdge", function (params) {
+          if (params.nodes.length === 0) populateSidebarEdge(params.edges[0]);
+        });
+
+        network.on("deselectNode", function () {
+          clearSidebar();
+        });
+      }
+
+      function updatePhysics() {
+        if (!network) return;
+        network.setOptions({
+          physics: {
+            barnesHut: {
+              gravitationalConstant: parseInt(document.getElementById('phys-gravity').value),
+              springLength: parseInt(document.getElementById('phys-springs').value)
+            }
+          }
+        });
+      }
+
+      function toggleEdgeMode() {
+        isEdgeMode = !isEdgeMode;
+        const btn = document.getElementById('btn-link-mode');
+        const banner = document.getElementById('edge-banner');
+        if (isEdgeMode) {
+          btn.style.background = '#3b82f6';
+          btn.style.color = '#fff';
+          banner.style.display = 'block';
+          edgeSourceNode = network.getSelectedNodes()[0] || null;
+        } else {
+          btn.style.background = 'var(--bg-card)';
+          btn.style.color = 'var(--text-main)';
+          banner.style.display = 'none';
+          edgeSourceNode = null;
+        }
+      }
+
+      function handleEdgeCreation(targetNodeId) {
+        if (!edgeSourceNode) {
+          edgeSourceNode = targetNodeId;
+          document.getElementById('edge-banner').innerText = "🔗 Source selected. Click target node to link...";
+          return;
+        }
+        
+        if (edgeSourceNode === targetNodeId) {
+          toggleEdgeMode(); // Cancel if clicked same node
+          return;
+        }
+
+        const label = prompt("Enter relationship description (e.g. 'Sibling', 'Enemies'):");
+        if (label !== null) {
+          const newEdge = { id: 'edge_' + Date.now(), from: edgeSourceNode, to: targetNodeId, label: label };
+          edgesDataset.add(newEdge);
+          syncMapStateToPandora();
+        }
+        toggleEdgeMode(); // Auto-exit edge mode
+      }
+
+      // Sidebar CRUD Logistics
+      function clearSidebar() {
+        document.getElementById('sidebar-title').innerText = "Character Details";
+        document.getElementById('sidebar-id').innerText = "";
+        document.getElementById('node-id').value = "";
+        document.getElementById('node-label').value = "";
+        document.getElementById('node-title').value = "";
+        document.getElementById('node-group').value = "neutral";
+        document.getElementById('node-size').value = 30;
+        document.getElementById('node-size-val').innerText = "30";
+        document.getElementById('node-image').value = "";
+        document.getElementById('node-notes').value = "";
+      }
+
+      function populateSidebarNode(nodeId) {
+        const node = nodesDataset.get(nodeId);
+        if (!node) return;
+        
+        document.getElementById('sidebar-title').innerText = "Edit Character";
+        document.getElementById('sidebar-id').innerText = `ID: ${node.id.substring(0,8)}...`;
+        document.getElementById('node-id').value = node.id;
+        document.getElementById('node-label').value = node.label || "";
+        document.getElementById('node-title').value = node.title || "";
+        document.getElementById('node-group').value = node.group || "neutral";
+        document.getElementById('node-size').value = node.value || 30;
+        document.getElementById('node-size-val').innerText = node.value || 30;
+        document.getElementById('node-image').value = (node.shape === 'circularImage') ? node.image : "";
+        document.getElementById('node-notes').value = node.notes || "";
+      }
+
+      function populateSidebarEdge(edgeId) {
+        clearSidebar();
+        const edge = edgesDataset.get(edgeId);
+        if (!edge) return;
+        document.getElementById('sidebar-title').innerText = "Edit Relationship";
+        document.getElementById('sidebar-id').innerText = `Edge: ${edgeId.substring(0,8)}...`;
+        document.getElementById('node-id').value = edge.id;
+        document.getElementById('node-label').value = edge.label || "";
+      }
+
+      function addNewCharacter() {
+        const newId = 'node_' + Date.now();
+        const newNode = {
+          id: newId,
+          label: "New Character",
+          group: "neutral",
+          value: 30,
+          color: FactionColors.neutral
+        };
+        nodesDataset.add(newNode);
+        syncMapStateToPandora();
+        network.selectNodes([newId]);
+        populateSidebarNode(newId);
+      }
+
+      function saveSelectedNode() {
+        const id = document.getElementById('node-id').value;
+        if (!id) return;
+
+        const label = document.getElementById('node-label').value;
+        
+        // Handle Edge Edit vs Node Edit
+        if (id.startsWith('edge_')) {
+          edgesDataset.update({ id: id, label: label });
+        } else {
+          const group = document.getElementById('node-group').value;
+          const title = document.getElementById('node-title').value;
+          const val = parseInt(document.getElementById('node-size').value);
+          const img = document.getElementById('node-image').value;
+          const notes = document.getElementById('node-notes').value;
+
+          const updatedNode = {
+            id: id,
+            label: label,
+            title: title,
+            group: group,
+            value: val,
+            notes: notes,
+            color: FactionColors[group] || FactionColors.default
+          };
+
+          if (img) {
+            updatedNode.shape = 'circularImage';
+            updatedNode.image = img;
+          } else {
+            updatedNode.shape = 'dot';
+          }
+
+          nodesDataset.update(updatedNode);
+        }
+        
+        syncMapStateToPandora();
+      }
+
+      function deleteSelectedElement() {
+        const selectedNodes = network.getSelectedNodes();
+        const selectedEdges = network.getSelectedEdges();
+        
+        if (selectedNodes.length === 0 && selectedEdges.length === 0) return;
+        
+        if (confirm("Delete selected item(s)?")) {
+          if (selectedNodes.length > 0) nodesDataset.remove(selectedNodes);
+          if (selectedEdges.length > 0) edgesDataset.remove(selectedEdges);
+          clearSidebar();
+          syncMapStateToPandora();
+        }
+      }
+
+      function syncMapStateToPandora() {
+        const activeId = PandoraState.activeBookId;
+        if (activeId && nodesDataset && edgesDataset) {
+          PandoraState.books[activeId].nodes = nodesDataset.get();
+          PandoraState.books[activeId].edges = edgesDataset.get();
+          saveGlobalState(); // Master function from Base Shell
+        }
+      }
+    </script>
   </main>
 
   <!-- =====================================================
