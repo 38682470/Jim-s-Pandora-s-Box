@@ -559,10 +559,14 @@
         default: { border: '#f59e0b', background: '#1e293b' }
       };
 
-      // Ensure map re-renders correctly when tab is clicked
-      document.querySelector('[data-target="map-view"]').addEventListener('click', () => {
-        setTimeout(() => renderCharacterMap(), 50);
-      });
+     // Ensure map re-renders correctly when tab is clicked with fallback book binding
+document.querySelector('[data-target="map-view"]').addEventListener('click', () => {
+  if (!PandoraState.activeBookId) {
+    const firstBookKey = Object.keys(PandoraState.books)[0];
+    if (firstBookKey) PandoraState.activeBookId = firstBookKey;
+  }
+  setTimeout(() => renderCharacterMap(), 50);
+});
 
       function renderCharacterMap() {
         const activeId = PandoraState.activeBookId;
