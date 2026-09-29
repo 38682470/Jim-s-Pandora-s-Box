@@ -436,7 +436,9 @@
       .cmap-sidebar { width: 340px; background: var(--bg-card); border-left: 1px solid var(--border-color); display: flex; flex-direction: column; box-shadow: -5px 0 20px rgba(0,0,0,0.5); z-index: 10; transition: transform 0.3s ease; }
       
       /* Network Canvas */
-      #network-canvas { flex: 1; width: 100%; outline: none; }
+     /* Network Canvas (Fixed Dimensions for Vis.js) */
+      #network-canvas { flex: 1; width: 100%; height: 100%; position: absolute; top: 0; left: 0; outline: none; }
+      .cmap-main { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; }
       
       /* Physics Controls Toolbar */
       .cmap-toolbar { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border-color); padding: 10px 15px; display: flex; gap: 15px; align-items: center; z-index: 5; }
@@ -563,6 +565,101 @@
       });
 
       function renderCharacterMap() {
+        const activeId = PandoraState.activeBookId;
+        const layout = document.getElementById('cmap-active-layout');
+        const placeholder = document.getElementById('cmap-placeholder');
+
+        if (!activeId) {
+          layout.style.display = 'none';
+          placeholder.style.display = 'flex';
+          return;
+        }
+
+        layout.style.display = 'flex';
+        placeholder.style.display = 'none';
+
+        const book = PandoraState.books[activeId];
+        
+        // Template Injection: If book has no nodes, inject the 10-node default
+        if (!book.nodes || book.nodes.length === 0) {
+          book.nodes = [
+            { id: 'peter', label: 'Peter Andersson', title: 'General Manager of Beartown Ice Hockey', group: 'neutral', value: 40, shape: 'dot', color: FactionColors.neutral },
+            { id: 'kira', label: 'Kira Andersson', title: 'Wife', group: 'protagonist', value: 30, color: FactionColors.protagonist },
+            { id: 'benji', label: 'Benji', title: 'Player', group: 'supporting', value: 30, color: FactionColors.supporting },
+            { id: 'char4', label: 'Character 4', group: 'neutral', value: 25, color: FactionColors.neutral },
+            { id: 'char5', label: 'Character 5', group: 'neutral', value: 25, color: FactionColors.neutral },
+            { id: 'char6', label: 'Character 6', group: 'neutral', value: 25, color: FactionColors.neutral },
+            { id: 'char7', label: 'Character 7', group: 'neutral', value: 25, color: FactionColors.neutral },
+            { id: 'char8', label: 'Character 8', group: 'neutral', value: 25, color: FactionColors.neutral },
+            { id: 'char9', label: 'Character 9', group: 'neutral', value: 25, color: FactionColors.neutral },
+            { id: 'char10', label: 'Character 10', group: 'neutral', value: 25, color: FactionColors.neutral }
+          ];
+          book.edges = [
+            { from: 'peter', to: 'kira', label: 'Spouse' },
+            { from: 'peter', to: 'benji', label: 'Player' },
+            { from: 'peter', to: 'char4' },
+            { from: 'peter', to: 'char5' },
+            { from: 'peter', to: 'char6' },
+            { from: 'peter', to: 'char7' },
+            { from: 'peter', to: 'char8' },
+            { from: 'peter', to: 'char9' },
+            { from: 'peter', to: 'char10' }
+          ];
+        }
+
+        nodesDataset = new vis.DataSet(book.nodes);
+        edgesDataset = new vis.DataSet(book.edges);
+
+        const container = document.getElementById('network-canvas');
+        const data = { nodes: nodesDataset, edges: edgesDataset };
+
+        const options = {
+          nodes: {
+            shape: 'dot', borderWidth: 3, borderWidthSelected: 5,
+            font: { color: '#f8fafc', size: 14, face: '-apple-system', strokeWidth: 3, strokeColor: '#0f172a' },
+            shadow: { enabled: true, color: 'rgba(0,0,0,0.6)', size: 10, x: 5, y: 5 }
+          },
+          edges: {
+            width: 2, selectionWidth: 3, color: { color: '#64748b', highlight: '#f59e0b' },
+            font: { color: '#94a3b8', size: 12, strokeWidth: 2, strokeColor: '#0f172a', align: 'top' },
+            smooth: { type: 'continuous' }, arrows: { to: { enabled: true, scaleFactor: 0.5 } }
+          },
+          physics: {
+            enabled: true, stabilization: false,
+            barnesHut: {
+              gravitationalConstant: parseInt(document.getElementById('phys-gravity').value),
+              centralGravity: 0.15,
+              springLength: parseInt(document.getElementById('phys-springs').value),
+              springConstant: 0.04, damping: 0.09
+            }
+          },
+          interaction: { hover: true, tooltipDelay: 200 }
+        };
+
+        if (network) {
+          network.destroy();
+        }
+        network = new vis.Network(container, data, options);
+
+        // Fix 2: Force dimensional recalculation after the DOM paints the flex layout
+        setTimeout(() => {
+          if (network) {
+            network.redraw();
+            network.fit();
+          }
+        }, 150);
+
+        network.on("selectNode", function (params) {
+          if (isEdgeMode) handleEdgeCreation(params.nodes[0]);
+          else populateSidebarNode(params.nodes[0]);
+        });
+        network.on("selectEdge", function (params) {
+          if (params.nodes.length === 0) populateSidebarEdge(params.edges[0]);
+        });
+        network.on("deselectNode", function () {
+          clearSidebar();
+        });
+      }
         const activeId = PandoraState.activeBookId;
         const layout = document.getElementById('cmap-active-layout');
         const placeholder = document.getElementById('cmap-placeholder');
