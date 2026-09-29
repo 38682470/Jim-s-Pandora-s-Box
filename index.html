@@ -1,1158 +1,686 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Literature Studio Suite - Unified SPA</title>
-  <style>
-    :root {
-      --bg-main: #0f172a;
-      --bg-card: #1e293b;
-      --bg-inner: #0f172a;
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-      --border-color: #334155;
-      --accent-color: #f59e0b;
-      --accent-glow: rgba(245, 158, 11, 0.25);
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-
-    body {
-      background-color: var(--bg-main);
-      color: var(--text-main);
-      padding: 20px;
-      max-width: 1100px;
-      margin: 0 auto;
-    }
-
-    /* Top SPA Navigation Bar */
-    .spa-header {
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      padding: 14px 20px;
-      margin-bottom: 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-
-    .spa-brand h1 {
-      font-size: 1.4rem;
-      color: var(--accent-color);
-    }
-
-    .spa-brand p {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-    }
-
-    .spa-nav {
-      display: flex;
-      gap: 8px;
-    }
-
-    .nav-btn {
-      background: var(--bg-inner);
-      color: var(--text-muted);
-      border: 1px solid var(--border-color);
-      padding: 8px 16px;
-      border-radius: 6px;
-      font-weight: bold;
-      cursor: pointer;
-      font-size: 0.85rem;
-      transition: all 0.2s ease;
-    }
-
-    .nav-btn.active, .nav-btn:hover {
-      background: var(--accent-color);
-      color: #000;
-      border-color: var(--accent-color);
-    }
-
-    /* Views */
-    .view-section { display: none; }
-    .view-section.active { display: block; }
-
-    /* Common UI Elements */
-    select, button, input[type="text"], input[type="url"], input[type="number"], textarea {
-      background: var(--bg-card);
-      color: var(--text-main);
-      border: 1px solid var(--border-color);
-      padding: 10px 14px;
-      border-radius: 6px;
-      font-size: 0.85rem;
-    }
-
-    textarea { width: 100%; resize: vertical; }
-
-    button { cursor: pointer; font-weight: 600; }
-    button.btn-action { background: var(--accent-color); color: #000; border: none; }
-    button.btn-action:hover { opacity: 0.9; }
-
-    .metric-badge {
-      display: inline-block;
-      margin-top: 6px;
-      padding: 4px 12px;
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: 20px;
-      font-size: 0.8rem;
-      font-weight: 700;
-      color: var(--text-muted);
-    }
-
-    /* ==========================================================================
-       MODULE 1: EBBINGHAUS FLASHCARD STUDIO STYLES
-       ========================================================================== */
-    .bookshelf-wrapper {
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 20px;
-    }
-
-    .bookshelf-title {
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: var(--text-muted);
-      margin-bottom: 12px;
-      font-weight: 700;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .bookshelf-grid {
-      display: flex;
-      gap: 16px;
-      overflow-x: auto;
-      padding-bottom: 8px;
-    }
-
-    .book-tile {
-      flex: 0 0 120px;
-      height: 160px;
-      border-radius: 8px;
-      border: 3px solid var(--border-color);
-      background: var(--bg-inner);
-      cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 6px;
-      transition: all 0.2s ease;
-      position: relative;
-    }
-
-    .book-tile.active { box-shadow: 0 0 14px var(--accent-glow); }
-    .book-tile.interleaved-selected { border-color: #3b82f6 !important; box-shadow: 0 0 10px rgba(59, 130, 246, 0.4); }
-    .book-tile img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
-    .book-fallback { font-size: 0.75rem; font-weight: bold; padding: 4px; }
-
-    .delete-deck-btn {
-      position: absolute;
-      top: -8px; right: -8px;
-      background-color: #dc2626; color: white;
-      border: 2px solid var(--bg-card);
-      border-radius: 50%;
-      width: 24px; height: 24px;
-      font-size: 14px; font-weight: bold;
-      cursor: pointer; opacity: 0;
-      transition: opacity 0.2s ease;
-    }
-    .book-tile:hover .delete-deck-btn { opacity: 1; }
-
-    .leitner-bar {
-      display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      gap: 8px;
-      margin-bottom: 16px;
-    }
-
-    .box-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      padding: 8px;
-      text-align: center;
-    }
-
-    .box-card .box-label { font-size: 0.65rem; color: var(--text-muted); font-weight: bold; }
-    .box-card .box-count { font-size: 1.3rem; font-weight: bold; color: var(--accent-color); }
-
-    .controls-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 16px;
-      flex-wrap: wrap;
-    }
-
-    .controls-group { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-
-    .technique-tabs {
-      display: flex;
-      gap: 4px;
-      background: var(--bg-card);
-      padding: 6px;
-      border-radius: 10px 10px 0 0;
-      border: 1px solid var(--border-color);
-      border-bottom: none;
-    }
-
-    .tab-btn {
-      flex: 1; padding: 10px; text-align: center;
-      background: transparent; border: none;
-      color: var(--text-muted); font-weight: 700; font-size: 0.85rem;
-      border-radius: 6px; cursor: pointer;
-    }
-    .tab-btn.active { background: var(--accent-color); color: #000; }
-
-    .card-container {
-      background: var(--bg-card);
-      border: 2px solid var(--accent-color);
-      border-radius: 0 0 12px 12px;
-      padding: 24px;
-      min-height: 340px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      box-shadow: 0 6px 24px var(--accent-glow);
-    }
-
-    .card-meta {
-      display: flex; justify-content: space-between;
-      font-size: 0.75rem; color: var(--text-muted); font-weight: bold;
-      margin-bottom: 16px; flex-wrap: wrap; gap: 8px;
-    }
-
-    .card-prompt { font-size: 1.15rem; font-weight: 600; line-height: 1.5; margin-bottom: 16px; }
-    .prompt-image-container { margin: 12px 0 20px 0; text-align: center; }
-    .prompt-image { max-width: 100%; max-height: 280px; border-radius: 8px; border: 1px solid var(--border-color); object-fit: contain; }
-
-    .model-answer-box {
-      background: var(--bg-inner);
-      border-left: 4px solid var(--accent-color);
-      padding: 14px; border-radius: 4px;
-      font-size: 0.95rem; line-height: 1.5; margin-top: 12px;
-    }
-
-    .cloze-target { background: var(--accent-color); color: #000; padding: 2px 8px; border-radius: 4px; font-weight: bold; }
-
-    .anki-rating-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 20px; }
-    .btn-again { background: #dc2626; color: #fff; border: none; }
-    .btn-hard  { background: #ea580c; color: #fff; border: none; }
-    .btn-good  { background: #16a34a; color: #fff; border: none; }
-    .btn-easy  { background: #2563eb; color: #fff; border: none; }
-
-    /* ==========================================================================
-       MODULE 2: CHARACTER MAPPING STYLES
-       ========================================================================== */
-    .character-controls {
-      display: flex; justify-content: space-between; align-items: center;
-      gap: 12px; margin-bottom: 20px; flex-wrap: wrap;
-    }
-
-    .character-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 16px;
-    }
-
-    .character-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: 10px;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      position: relative;
-    }
-
-    .character-header { display: flex; gap: 12px; align-items: center; }
-    .character-avatar {
-      width: 60px; height: 60px; border-radius: 50%;
-      object-fit: cover; border: 2px solid var(--accent-color);
-      background: var(--bg-inner); display: flex; align-items: center; justify-content: center;
-      font-weight: bold; color: var(--text-muted); font-size: 1.2rem;
-    }
-
-    .character-title h4 { font-size: 1.05rem; color: var(--text-main); }
-    .character-title span { font-size: 0.75rem; color: var(--accent-color); font-weight: bold; }
-
-    .character-body { font-size: 0.85rem; color: var(--text-muted); line-height: 1.4; }
-
-    .relationship-tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-    .relationship-tag {
-      background: var(--bg-inner); border: 1px solid var(--border-color);
-      border-radius: 4px; padding: 2px 8px; font-size: 0.72rem; color: var(--text-main);
-    }
-
-    .card-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: auto; }
-
-    /* ==========================================================================
-       MODULE 3: CHAPTER REVIEW STYLES
-       ========================================================================== */
-    .chapter-controls {
-      display: flex; justify-content: space-between; align-items: center;
-      gap: 12px; margin-bottom: 20px; flex-wrap: wrap;
-    }
-
-    .chapter-list { display: flex; flex-direction: column; gap: 16px; }
-
-    .chapter-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: 10px;
-      padding: 18px;
-    }
-
-    .chapter-card-header {
-      display: flex; justify-content: space-between; align-items: center;
-      border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 12px;
-    }
-
-    .chapter-title-group h4 { font-size: 1.1rem; color: var(--accent-color); }
-    .chapter-title-group span { font-size: 0.8rem; color: var(--text-muted); }
-
-    .chapter-section-title {
-      font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted);
-      font-weight: bold; margin: 10px 0 4px 0;
-    }
-
-    .quote-box {
-      background: var(--bg-inner); border-left: 3px solid var(--accent-color);
-      padding: 8px 12px; margin-top: 6px; font-style: italic; font-size: 0.85rem;
-    }
-
-    .links-list { list-style: none; padding: 0; margin-top: 6px; }
-    .links-list li { margin-bottom: 4px; font-size: 0.85rem; }
-    .links-list a { color: #3b82f6; text-decoration: none; }
-    .links-list a:hover { text-decoration: underline; }
-
-    /* Modals */
-    .modal-overlay {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.8); z-index: 100;
-      display: flex; align-items: center; justify-content: center;
-    }
-    
-    .modal-content {
-      background: var(--bg-card); padding: 24px; border-radius: 12px;
-      width: 90%; max-width: 650px; max-height: 85vh; overflow-y: auto;
-      border: 1px solid var(--border-color); box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    }
-
-    .hidden { display: none !important; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Jim's Pandora's Box</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        :root {
+            --bg: #1e1e1e; --panel: #2a2a2a; --text: #f0f0f0; --accent: #0A84FF; --border: #333;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
+        
+        /* Navigation */
+        nav { background: rgba(20, 20, 20, 0.9); padding: 10px; display: flex; gap: 10px; border-bottom: 1px solid var(--border); z-index: 100; backdrop-filter: blur(10px); }
+        button, .btn { background: var(--panel); color: var(--text); border: 1px solid var(--border); padding: 8px 16px; border-radius: 8px; cursor: pointer; text-decoration: none; display: inline-block; font-size: 14px; }
+        button:hover, .btn:hover { background: #3a3a3a; }
+        button.active { background: var(--accent); color: white; border-color: var(--accent); }
+        .flex-spacer { flex-grow: 1; }
+        
+        /* Views */
+        .view { display: none; flex: 1; overflow-y: auto; position: relative; height: calc(100vh - 50px); }
+        .view.active { display: flex; flex-direction: column; }
+        
+        /* Home View */
+        #home-view { background-size: cover; background-position: center; padding: 20px; align-items: center; justify-content: center; }
+        .home-card { background: rgba(42, 42, 42, 0.85); padding: 30px; border-radius: 16px; backdrop-filter: blur(20px); text-align: center; max-width: 500px; width: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .home-card h1 { margin-bottom: 20px; }
+        .home-card input, .home-card select { width: 100%; margin-bottom: 15px; padding: 10px; background: #111; color: #fff; border: 1px solid var(--border); border-radius: 8px; }
+        
+        /* Shared Header (Gemini Link) */
+        .section-header { padding: 10px 20px; background: #1a1a1a; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
+        .gemini-btn { background: #4285F4; border-color: #4285F4; color: white; font-weight: bold; }
+        
+        /* Chapter View */
+        #chapter-view { flex-direction: column; }
+        .chapter-content { flex: 1; display: flex; overflow: hidden; position: relative; }
+        .text-editor { flex: 1; padding: 20px; overflow-y: auto; border-right: 1px solid var(--border); font-size: 18px; line-height: 1.6; }
+        [contenteditable]:empty:before { content: attr(placeholder); color: #888; display: block; }
+        
+        /* Canvas */
+        .canvas-container { flex: 1; position: relative; background: #222; overflow: hidden; display: flex; flex-direction: column; }
+        .canvas-toolbar { padding: 10px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; gap: 10px; align-items: center; }
+        canvas { flex: 1; background: #2a2a2b; touch-action: none; cursor: crosshair; }
+        
+        /* Map View */
+        #map-view .map-container { flex: 1; display: flex; overflow: hidden; }
+        #network-canvas { flex: 1; background: #1a1a1a; }
+        .sidebar { width: 300px; background: var(--panel); border-left: 1px solid var(--border); padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+        .sidebar input, .sidebar textarea { width: 100%; background: #111; border: 1px solid var(--border); color: var(--text); padding: 10px; border-radius: 8px; font-family: inherit; }
+        .sidebar textarea { resize: vertical; min-height: 100px; }
+        
+        /* Flashcard View */
+        #flashcard-view .fc-container { padding: 20px; max-width: 800px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 20px; }
+        .fc-stats { display: flex; justify-content: space-between; background: var(--panel); padding: 15px; border-radius: 12px; }
+        .fc-stats div { text-align: center; }
+        .fc-stats span { display: block; font-size: 24px; font-weight: bold; color: var(--accent); }
+        .card { background: var(--panel); min-height: 300px; border-radius: 16px; padding: 30px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; font-size: 24px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 1px solid var(--border); cursor: pointer; position: relative; }
+        .card-controls { display: flex; gap: 10px; justify-content: center; margin-top: 20px; }
+        .card-controls button { flex: 1; padding: 15px; font-size: 16px; font-weight: bold; }
+        .btn-hard { background: #FF453A; border-color: #FF453A; }
+        .btn-good { background: #32D74B; border-color: #32D74B; }
+        .btn-easy { background: #0A84FF; border-color: #0A84FF; }
+        
+        /* Modal */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; }
+        .modal { background: var(--panel); padding: 25px; border-radius: 16px; width: 90%; max-width: 500px; border: 1px solid var(--border); }
+        .modal h2 { margin-bottom: 20px; }
+        .modal-body { display: flex; flex-direction: column; gap: 15px; }
+        .snapshot-list { max-height: 200px; overflow-y: auto; background: #111; border-radius: 8px; padding: 10px; }
+        .snapshot-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #333; align-items: center; }
+    </style>
 </head>
 <body>
 
-  <!-- TOP ROUTING HEADER -->
-  <header class="spa-header">
-    <div class="spa-brand">
-      <h1>Ebbinghaus Literature Studio Suite</h1>
-      <p>Multi-Book Reader • Spaced Repetition • Character Web • Chapter Analysis</p>
-    </div>
-    <nav class="spa-nav">
-      <button id="nav-ebbinghaus" class="nav-btn active" onclick="switchView('ebbinghaus')">🎴 Flashcard Studio</button>
-      <button id="nav-character" class="nav-btn" onclick="switchView('character')">🕸️ Character Mapping</button>
-      <button id="nav-chapter" class="nav-btn" onclick="switchView('chapter')">📖 Chapter Reviews</button>
+    <!-- Global Navigation -->
+    <nav>
+        <button class="nav-btn active" data-target="home-view">🏠 Home</button>
+        <button class="nav-btn" data-target="chapter-view">📝 Chapter Review</button>
+        <button class="nav-btn" data-target="map-view">🕸️ Character Map</button>
+        <button class="nav-btn" data-target="flashcard-view">🃏 Flashcards</button>
+        <div class="flex-spacer"></div>
+        <span id="current-book-label" style="align-self: center; color: #aaa; font-weight: bold; margin-right: 15px;">No Book Selected</span>
+        <button onclick="openLibrary()">📚 Library Center</button>
     </nav>
-  </header>
 
-  <!-- ==========================================================================
-       VIEW 1: EBBINGHAUS FLASHCARD STUDIO
-       ========================================================================== -->
-  <section id="view-ebbinghaus" class="view-section active">
-    <div style="text-align: center; margin-bottom: 16px;">
-      <div id="retention-metric" class="metric-badge">Session Retention: N/A (Target: ~85%)</div>
-    </div>
-
-    <!-- Bookshelf -->
-    <div class="bookshelf-wrapper">
-      <div class="bookshelf-title">
-        <span>Bookshelf Collection</span>
-        <button onclick="openInterleaveModal()" style="padding: 4px 8px; font-size: 0.75rem; background: var(--bg-inner);">Custom Multi-Book Selection</button>
-      </div>
-      <div class="bookshelf-grid" id="bookshelf"></div>
-    </div>
-
-    <!-- Leitner Boxes Bar -->
-    <div class="leitner-bar">
-      <div class="box-card"><div class="box-label">BOX 1</div><div class="box-count" id="b1-count">0</div></div>
-      <div class="box-card"><div class="box-label">BOX 2</div><div class="box-count" id="b2-count">0</div></div>
-      <div class="box-card"><div class="box-label">BOX 3</div><div class="box-count" id="b3-count">0</div></div>
-      <div class="box-card"><div class="box-label">BOX 4</div><div class="box-count" id="b4-count">0</div></div>
-      <div class="box-card"><div class="box-label">BOX 5</div><div class="box-count" id="b5-count">0</div></div>
-      <div class="box-card"><div class="box-label">MASTERED</div><div class="box-count" id="bm-count">0</div></div>
-    </div>
-
-    <!-- Controls Bar -->
-    <div class="controls-bar">
-      <div class="controls-group">
-        <select id="book-select" onchange="filterByBook(this.value)">
-          <option value="ALL">All Books Combined (Global Interleaved)</option>
-        </select>
-
-        <button id="btn-due-toggle" onclick="toggleDueFilter()" title="Filter cards where nextDueDate <= Now">
-          📅 Due Cards Only
-        </button>
-
-        <label style="font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px; cursor: pointer; background: var(--bg-card); padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px;">
-          <input type="checkbox" id="guard-toggle" onchange="toggleGuard(this.checked)">
-          <span>⏱️ 3s Delay Guard</span>
-        </label>
-      </div>
-
-      <div class="controls-group">
-        <button class="btn-action" onclick="triggerImport()">+ Bulk Import</button>
-        <button onclick="openCardManager()">Manage Cards</button>
-        <button onclick="exportData()">Export</button>
-        <button onclick="resetApp()">Delete All Data</button>
-      </div>
-    </div>
-
-    <!-- Technique Tabs -->
-    <div class="technique-tabs">
-      <button class="tab-btn active" id="tab-feynman" onclick="setMode('feynman')">Feynman Technique</button>
-      <button class="tab-btn" id="tab-cloze" onclick="setMode('cloze')">Cloze Technique</button>
-      <button class="tab-btn" id="tab-standard" onclick="setMode('standard')">Standard Q&A</button>
-    </div>
-
-    <!-- Card Container -->
-    <div class="card-container">
-      <div>
-        <div class="card-meta">
-          <span id="card-book-title">NO CARDS LOADED</span>
-          <span id="card-due-status" style="color: var(--accent-color);">Due: Now</span>
-          <span id="card-counter">Q0/0</span>
-          <span id="card-box-label">-</span>
+    <!-- Home View -->
+    <main id="home-view" class="view active">
+        <div class="home-card">
+            <h1>Pandora's Box</h1>
+            <label style="display:block; text-align:left; margin-bottom:5px;">Select Book Context:</label>
+            <select id="book-selector" onchange="switchBook()"></select>
+            
+            <button onclick="createNewBook()" style="width:100%; margin-bottom:20px; background:var(--accent);">+ Create New Book Folder</button>
+            
+            <label style="display:block; text-align:left; margin-bottom:5px;">Set Custom Wallpaper:</label>
+            <input type="file" id="wallpaper-upload" accept="image/*" onchange="handleWallpaper(event)">
+            
+            <hr style="border: 0; height: 1px; background: var(--border); margin: 20px 0;">
+            <a href="freeform://" class="btn" style="width:100%; font-size:18px; font-weight:bold; background:#fff; color:#000;">Launch iPad Freeform</a>
         </div>
+    </main>
 
-        <div class="card-prompt" id="card-prompt">Please import JSON data or add cards to begin.</div>
-
-        <div id="prompt-image-box" class="prompt-image-container hidden">
-          <img id="prompt-img" class="prompt-image" src="" alt="Question Diagram">
+    <!-- Chapter Review View -->
+    <main id="chapter-view" class="view">
+        <div class="section-header">
+            <h2>Chapter Review</h2>
+            <a href="#" class="btn gemini-btn gemini-link" target="_blank">Launch Gemini Notebook</a>
         </div>
-
-        <div id="mode-feynman-panel">
-          <textarea id="feynman-input" placeholder="Explain this concept in simple terms as if teaching someone else..."></textarea>
-          <button class="reveal-btn" onclick="toggleAnswer()" style="width:100%;">Compare with Model Answer</button>
-        </div>
-
-        <div id="mode-cloze-panel" class="hidden">
-          <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:10px;">Recall the missing target phrase, then reveal:</p>
-          <button class="reveal-btn" onclick="toggleAnswer()" style="width:100%;">Reveal Blank Target</button>
-        </div>
-
-        <div id="mode-standard-panel" class="hidden">
-          <button class="reveal-btn" onclick="toggleAnswer()" style="width:100%;">Show Model Answer</button>
-        </div>
-
-        <div id="model-answer" class="model-answer-box hidden"></div>
-      </div>
-
-      <div>
-        <div style="font-size: 0.7rem; text-align: center; color: var(--text-muted); margin-bottom: 6px; font-weight: bold;">RATE YOUR RECALL (ANKI SM-2)</div>
-        <div class="anki-rating-bar">
-          <button class="btn-again" onclick="rateCard('again')">Again<br><small>(Reset Box 1)</small></button>
-          <button class="btn-hard" onclick="rateCard('hard')">Hard<br><small>(Stay in Box)</small></button>
-          <button class="btn-good" onclick="rateCard('good')">Good<br><small>(+1 Box)</small></button>
-          <button class="btn-easy" onclick="rateCard('easy')">Easy<br><small>(+2 Boxes)</small></button>
-        </div>
-      </div>
-    </div>
-  </section>
-
-
-  <!-- ==========================================================================
-       VIEW 2: CHARACTER MAPPING
-       ========================================================================== -->
-  <section id="view-character" class="view-section">
-    <div class="character-controls">
-      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-        <select id="character-book-filter" onchange="renderCharacterGrid()">
-          <option value="ALL">All Books</option>
-        </select>
-        <input type="text" id="character-search" placeholder="Search character name or role..." oninput="renderCharacterGrid()" style="width: 240px;">
-      </div>
-      <button class="btn-action" onclick="openAddCharacterModal()">+ Add New Character</button>
-    </div>
-
-    <div id="character-grid" class="character-grid"></div>
-  </section>
-
-
-  <!-- ==========================================================================
-       VIEW 3: CHAPTER REVIEWS
-       ========================================================================== -->
-  <section id="view-chapter" class="view-section">
-    <div class="chapter-controls">
-      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-        <select id="chapter-book-filter" onchange="renderChapterList()">
-          <option value="ALL">All Books</option>
-        </select>
-        <input type="text" id="chapter-search" placeholder="Search chapters or summaries..." oninput="renderChapterList()" style="width: 240px;">
-      </div>
-      <button class="btn-action" onclick="openAddChapterModal()">+ Add New Chapter</button>
-    </div>
-
-    <div id="chapter-list" class="chapter-list"></div>
-  </section>
-
-
-  <!-- ==========================================================================
-       MODALS
-       ========================================================================== -->
-
-  <!-- Multi-Book Modal -->
-  <div id="interleave-modal" class="modal-overlay hidden">
-    <div class="modal-content">
-      <h3 style="margin-bottom: 10px; color: var(--accent-color);">Multi-Book Interleaving</h3>
-      <div id="interleave-checkboxes" style="display: flex; flex-direction: column; gap: 8px; margin: 15px 0;"></div>
-      <div style="display: flex; gap: 10px; justify-content: flex-end;">
-        <button onclick="closeInterleaveModal()" style="background: transparent;">Cancel</button>
-        <button class="btn-action" onclick="applyInterleavedSelection()">Start Session</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Import Modal -->
-  <div id="import-modal" class="modal-overlay hidden">
-    <div class="modal-content">
-      <h3 style="margin-bottom: 10px; color: var(--accent-color);">Bulk Import JSON</h3>
-      <textarea id="import-textarea" style="height: 200px; font-family: monospace; font-size: 0.8rem; margin-bottom: 15px;"></textarea>
-      <div style="display: flex; gap: 10px; justify-content: flex-end;">
-        <button onclick="closeImportModal()" style="background: transparent;">Cancel</button>
-        <button class="btn-action" onclick="processImport()">Import Cards</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Flashcard Manager Modal -->
-  <div id="card-manager-modal" class="modal-overlay hidden">
-    <div class="modal-content">
-      <h3 style="margin-bottom: 10px; color: var(--accent-color);">Manage Flashcards</h3>
-      <div id="card-manager-list" style="max-height: 350px; overflow-y: auto; margin-bottom: 15px; border: 1px solid var(--border-color); border-radius: 6px;"></div>
-      <div style="display: flex; gap: 10px; justify-content: space-between;">
-        <button class="btn-action" onclick="openAddCardModal()">+ Add New Card</button>
-        <button onclick="closeCardManager()" style="background: transparent;">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Flashcard Single Editor Modal -->
-  <div id="edit-card-modal" class="modal-overlay hidden">
-    <div class="modal-content">
-      <h3 style="margin-bottom: 10px; color: var(--accent-color);" id="edit-modal-title">Edit Card</h3>
-      <input type="hidden" id="edit-card-index">
-      <div style="margin-bottom: 10px;"><label style="font-size: 0.8rem; color: var(--text-muted);">Book</label><input type="text" id="edit-card-book"></div>
-      <div style="margin-bottom: 10px;"><label style="font-size: 0.8rem; color: var(--text-muted);">Prompt</label><textarea id="edit-card-prompt" style="height: 60px;"></textarea></div>
-      <div style="margin-bottom: 10px;"><label style="font-size: 0.8rem; color: var(--text-muted);">Diagram/Image URL</label><input type="url" id="edit-card-image"></div>
-      <div style="margin-bottom: 10px;"><label style="font-size: 0.8rem; color: var(--text-muted);">Model Answer</label><textarea id="edit-card-answer" style="height: 60px;"></textarea></div>
-      <div style="margin-bottom: 15px;"><label style="font-size: 0.8rem; color: var(--text-muted);">Cloze Target</label><input type="text" id="edit-card-cloze"></div>
-      <div style="display: flex; gap: 10px; justify-content: flex-end;">
-        <button onclick="closeEditModal()" style="background: transparent;">Cancel</button>
-        <button class="btn-action" onclick="saveCardEdit()">Save</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Character Modal -->
-  <div id="character-modal" class="modal-overlay hidden">
-    <div class="modal-content">
-      <h3 style="margin-bottom: 10px; color: var(--accent-color);" id="character-modal-title">Add Character</h3>
-      <input type="hidden" id="character-edit-id">
-      <div style="margin-bottom: 10px;"><label style="font-size:0.8rem; color:var(--text-muted);">Book Title</label><input type="text" id="char-book" placeholder="e.g. Les Misérables"></div>
-      <div style="margin-bottom: 10px;"><label style="font-size:0.8rem; color:var(--text-muted);">Character Name</label><input type="text" id="char-name" placeholder="e.g. Jean Valjean"></div>
-      <div style="margin-bottom: 10px;"><label style="font-size:0.8rem; color:var(--text-muted);">Role / Archetype</label><input type="text" id="char-role" placeholder="e.g. Protagonist / Ex-convict"></div>
-      <div style="margin-bottom: 10px;"><label style="font-size:0.8rem; color:var(--text-muted);">Avatar Image URL</label><input type="url" id="char-avatar" placeholder="https://..."></div>
-      <div style="margin-bottom: 10px;"><label style="font-size:0.8rem; color:var(--text-muted);">Description / Bio</label><textarea id="char-desc" style="height: 70px;"></textarea></div>
-      <div style="margin-bottom: 15px;"><label style="font-size:0.8rem; color:var(--text-muted);">Relationships (Comma separated key-values, e.g., "Javert: Arch-enemy, Cosette: Adoptive father")</label><input type="text" id="char-rel"></div>
-      <div style="display: flex; gap: 10px; justify-content: flex-end;">
-        <button onclick="closeCharacterModal()" style="background: transparent;">Cancel</button>
-        <button class="btn-action" onclick="saveCharacter()">Save Character</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Chapter Modal -->
-  <div id="chapter-modal" class="modal-overlay hidden">
-    <div class="modal-content">
-      <h3 style="margin-bottom: 10px; color: var(--accent-color);" id="chapter-modal-title">Add Chapter Review</h3>
-      <input type="hidden" id="chapter-edit-id">
-      <div style="margin-bottom: 10px;"><label style="font-size:0.8rem; color:var(--text-muted);">Book Title</label><input type="text" id="chap-book" placeholder="e.g. Les Misérables"></div>
-      <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-        <div style="flex:1;"><label style="font-size:0.8rem; color:var(--text-muted);">Chapter #</label><input type="number" id="chap-num" value="1"></div>
-        <div style="flex:3;"><label style="font-size:0.8rem; color:var(--text-muted);">Chapter Title</label><input type="text" id="chap-title" placeholder="An Option for the Poor"></div>
-      </div>
-      <div style="margin-bottom: 10px;"><label style="font-size:0.8rem; color:var(--text-muted);">Summary & Analysis</label><textarea id="chap-summary" style="height: 90px;"></textarea></div>
-      <div style="margin-bottom: 10px;"><label style="font-size:0.8rem; color:var(--text-muted);">Key Quotes (One per line)</label><textarea id="chap-quotes" style="height: 60px;"></textarea></div>
-      <div style="margin-bottom: 15px;"><label style="font-size:0.8rem; color:var(--text-muted);">External Study Links (Format: Label | URL, one per line)</label><textarea id="chap-links" style="height: 60px;" placeholder="SparkNotes Analysis | https://sparknotes.com/..."></textarea></div>
-      <div style="display: flex; gap: 10px; justify-content: flex-end;">
-        <button onclick="closeChapterModal()" style="background: transparent;">Cancel</button>
-        <button class="btn-action" onclick="saveChapter()">Save Chapter</button>
-      </div>
-    </div>
-  </div>
-
-
-  <!-- ==========================================================================
-       JAVASCRIPT ENGINE
-       ========================================================================== -->
-  <script>
-    // --- COLOR PALETTES ---
-    const PASTEL_PALETTES = [
-      { bg: '#fdf2f8', border: '#f472b6', accent: '#db2777', text: '#831843' },
-      { bg: '#f0fdf4', border: '#4ade80', accent: '#16a34a', text: '#14532d' },
-      { bg: '#eff6ff', border: '#60a5fa', accent: '#2563eb', text: '#1e3a8a' },
-      { bg: '#fef3c7', border: '#fbbf24', accent: '#d97706', text: '#78350f' },
-      { bg: '#f5f3ff', border: '#a78bfa', accent: '#7c3aed', text: '#4c1d95' }
-    ];
-
-    function getBookPalette(bookTitle) {
-      let hash = 0;
-      for (let i = 0; i < bookTitle.length; i++) hash = bookTitle.charCodeAt(i) + ((hash << 5) - hash);
-      return PASTEL_PALETTES[Math.abs(hash) % PASTEL_PALETTES.length];
-    }
-
-    // --- GLOBAL STATES ---
-    let cards = [];
-    let filteredCards = [];
-    let selectedBooks = [];
-    let currentIndex = 0;
-    let currentMode = 'feynman';
-    let currentBookFilter = 'ALL';
-    let dueOnlyFilter = false;
-    let delayGuardActive = false;
-    let countdownTimer = null;
-    let sessionStats = { total: 0, success: 0 };
-
-    let characters = [];
-    let chapters = [];
-
-    // --- SPA ROUTER ---
-    function switchView(viewName) {
-      document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
-      document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
-
-      document.getElementById(`view-${viewName}`).classList.add('active');
-      document.getElementById(`nav-${viewName}`).classList.add('active');
-
-      if (viewName === 'character') renderCharacterGrid();
-      if (viewName === 'chapter') renderChapterList();
-    }
-
-    // --- INITIALIZATION ---
-    window.onload = function() {
-      // Load Cards
-      const savedCards = localStorage.getItem('gemini_flashcards_v3');
-      cards = savedCards ? JSON.parse(savedCards) : [];
-
-      // Load Characters
-      const savedChars = localStorage.getItem('gemini_characters_v3');
-      characters = savedChars ? JSON.parse(savedChars) : [];
-
-      // Load Chapters
-      const savedChaps = localStorage.getItem('gemini_chapters_v3');
-      chapters = savedChaps ? JSON.parse(savedChaps) : [];
-
-      updateBookshelf();
-      populateBookSelects();
-      applyFilter();
-      renderCharacterGrid();
-      renderChapterList();
-    };
-
-    function saveData() {
-      localStorage.setItem('gemini_flashcards_v3', JSON.stringify(cards));
-      localStorage.setItem('gemini_characters_v3', JSON.stringify(characters));
-      localStorage.setItem('gemini_chapters_v3', JSON.stringify(chapters));
-    }
-
-    function populateBookSelects() {
-      const allBooks = [...new Set([
-        ...cards.map(c => c.book),
-        ...characters.map(c => c.book),
-        ...chapters.map(c => c.book)
-      ])].filter(Boolean);
-
-      // Flashcard selector
-      const select = document.getElementById('book-select');
-      select.innerHTML = '<option value="ALL">All Books Combined (Global Interleaved)</option>';
-      if (selectedBooks.length > 0) {
-        const opt = document.createElement('option');
-        opt.value = "MULTI"; opt.textContent = `Custom Interleaved (${selectedBooks.length} Books)`;
-        select.appendChild(opt);
-      }
-      allBooks.forEach(b => {
-        const opt = document.createElement('option'); opt.value = b; opt.textContent = b;
-        select.appendChild(opt);
-      });
-      select.value = currentBookFilter;
-
-      // Character Filter Select
-      const charSelect = document.getElementById('character-book-filter');
-      charSelect.innerHTML = '<option value="ALL">All Books</option>';
-      allBooks.forEach(b => charSelect.innerHTML += `<option value="${b}">${b}</option>`);
-
-      // Chapter Filter Select
-      const chapSelect = document.getElementById('chapter-book-filter');
-      chapSelect.innerHTML = '<option value="ALL">All Books</option>';
-      allBooks.forEach(b => chapSelect.innerHTML += `<option value="${b}">${b}</option>`);
-    }
-
-    /* ==========================================================================
-       MODULE 1 LOGIC: EBBINGHAUS FLASHCARDS
-       ========================================================================== */
-    function setMode(mode) {
-      currentMode = mode;
-      document.querySelectorAll('.technique-tabs .tab-btn').forEach(btn => btn.classList.remove('active'));
-      document.getElementById(`tab-${mode}`).classList.add('active');
-
-      document.getElementById('mode-feynman-panel').classList.add('hidden');
-      document.getElementById('mode-cloze-panel').classList.add('hidden');
-      document.getElementById('mode-standard-panel').classList.add('hidden');
-      document.getElementById(`mode-${mode}-panel`).classList.remove('hidden');
-
-      document.getElementById('model-answer').classList.add('hidden');
-      renderCard();
-    }
-
-    function updateBookshelf() {
-      const shelf = document.getElementById('bookshelf');
-      shelf.innerHTML = '';
-      if (cards.length === 0) {
-        shelf.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem; padding: 10px;">Bookshelf empty. Use + Bulk Import to load cards.</div>';
-        return;
-      }
-
-      const allTile = document.createElement('div');
-      allTile.className = `book-tile ${currentBookFilter === 'ALL' ? 'active' : ''}`;
-      allTile.onclick = () => filterByBook('ALL');
-      allTile.innerHTML = `<div class="book-fallback">ALL BOOKS</div>`;
-      shelf.appendChild(allTile);
-
-      const bookMap = {};
-      cards.forEach(c => { if (!bookMap[c.book]) bookMap[c.book] = c.coverImage; });
-
-      Object.keys(bookMap).forEach(bookTitle => {
-        const palette = getBookPalette(bookTitle);
-        const tile = document.createElement('div');
-        tile.className = `book-tile ${currentBookFilter === bookTitle ? 'active' : ''}`;
-        tile.style.backgroundColor = palette.bg;
-        tile.style.borderColor = palette.border;
-        tile.onclick = () => filterByBook(bookTitle);
-
-        const delBtn = document.createElement('button');
-        delBtn.className = 'delete-deck-btn'; delBtn.innerHTML = '×';
-        delBtn.onclick = (e) => { e.stopPropagation(); deleteDeck(bookTitle); };
-        tile.appendChild(delBtn);
-
-        const content = document.createElement('div');
-        content.innerHTML = bookMap[bookTitle] ? `<img src="${bookMap[bookTitle]}">` : `<div class="book-fallback" style="color:${palette.text}">${bookTitle}</div>`;
-        tile.appendChild(content);
-        shelf.appendChild(tile);
-      });
-    }
-
-    function filterByBook(bookTitle) {
-      currentBookFilter = bookTitle;
-      document.getElementById('book-select').value = bookTitle;
-      updateBookshelf();
-      applyFilter();
-    }
-
-    function applyFilter() {
-      let baseList = [];
-      if (currentBookFilter === 'ALL') baseList = [...cards].sort(() => Math.random() - 0.5);
-      else if (currentBookFilter === 'MULTI') baseList = cards.filter(c => selectedBooks.includes(c.book)).sort(() => Math.random() - 0.5);
-      else baseList = cards.filter(c => c.book === currentBookFilter);
-
-      const now = new Date();
-      filteredCards = dueOnlyFilter ? baseList.filter(c => !c.nextDueDate || new Date(c.nextDueDate) <= now) : baseList;
-
-      currentIndex = 0;
-      updateBoxCounts();
-      renderCard();
-    }
-
-    function toggleDueFilter() {
-      dueOnlyFilter = !dueOnlyFilter;
-      const btn = document.getElementById('btn-due-toggle');
-      btn.style.borderColor = dueOnlyFilter ? '#3b82f6' : 'var(--border-color)';
-      applyFilter();
-    }
-
-    function toggleGuard(checked) { delayGuardActive = checked; }
-
-    function renderCard() {
-      const total = filteredCards.length;
-      document.getElementById('card-counter').textContent = `Q${total > 0 ? currentIndex + 1 : 0}/${total}`;
-
-      if (total === 0) {
-        document.getElementById('card-prompt').textContent = "No flashcards match the current filter.";
-        document.getElementById('card-book-title').textContent = "EMPTY";
-        document.getElementById('prompt-image-box').classList.add('hidden');
-        document.getElementById('model-answer').classList.add('hidden');
-        return;
-      }
-
-      const card = filteredCards[currentIndex];
-      document.getElementById('card-book-title').textContent = (card.book || 'UNASSIGNED').toUpperCase();
-      document.getElementById('card-box-label').textContent = card.box >= 6 ? 'MASTERED' : `BOX ${card.box || 1}`;
-
-      const imgBox = document.getElementById('prompt-image-box');
-      const img = document.getElementById('prompt-img');
-      if (card.promptImage || card.image) {
-        img.src = card.promptImage || card.image;
-        imgBox.classList.remove('hidden');
-      } else { imgBox.classList.add('hidden'); }
-
-      if (currentMode === 'cloze' && card.clozeTarget) {
-        const clozeText = card.answer.replace(new RegExp(card.clozeTarget, 'gi'), `<span class="cloze-target">[ ${card.clozeTarget.length} letters ]</span>`);
-        document.getElementById('card-prompt').innerHTML = `<strong>Prompt:</strong> ${card.prompt}<br><br>${clozeText}`;
-      } else {
-        document.getElementById('card-prompt').textContent = card.prompt;
-      }
-    }
-
-    function toggleAnswer() {
-      const card = filteredCards[currentIndex];
-      if (!card) return;
-      const ansBox = document.getElementById('model-answer');
-
-      if (delayGuardActive && ansBox.classList.contains('hidden')) {
-        let count = 3;
-        const revealBtns = document.querySelectorAll('.reveal-btn');
-        revealBtns.forEach(b => { b.disabled = true; b.textContent = `Guard Lock: Wait ${count}s...`; });
-        clearInterval(countdownTimer);
-        countdownTimer = setInterval(() => {
-          count--;
-          if (count > 0) revealBtns.forEach(b => b.textContent = `Guard Lock: Wait ${count}s...`);
-          else {
-            clearInterval(countdownTimer);
-            revealBtns.forEach(b => { b.disabled = false; b.textContent = "Show Model Answer"; });
-            ansBox.innerHTML = `<strong>Model Answer:</strong><br>${card.answer}`;
-            ansBox.classList.remove('hidden');
-          }
-        }, 1000);
-      } else {
-        ansBox.innerHTML = `<strong>Model Answer:</strong><br>${card.answer}`;
-        ansBox.classList.toggle('hidden');
-      }
-    }
-
-    function rateCard(rating) {
-      if (filteredCards.length === 0) return;
-      const card = filteredCards[currentIndex];
-      sessionStats.total++;
-
-      let box = card.box || 1;
-      let interval = card.interval || 1;
-      let ease = card.easeFactor || 2.5;
-
-      if (rating === 'again') { box = 1; interval = 1; ease = Math.max(1.3, ease - 0.2); }
-      else if (rating === 'hard') { interval = Math.max(1, Math.round(interval * 1.2)); }
-      else if (rating === 'good') { sessionStats.success++; box = Math.min(6, box + 1); interval = interval === 1 ? 6 : Math.round(interval * ease); }
-      else if (rating === 'easy') { sessionStats.success++; box = Math.min(6, box + 2); interval = Math.round(interval * ease * 1.3); ease += 0.15; }
-
-      card.box = box; card.interval = interval; card.easeFactor = ease;
-      const next = new Date(); next.setDate(next.getDate() + interval);
-      card.nextDueDate = next.toISOString();
-
-      saveData();
-      updateBoxCounts();
-      if (filteredCards.length > 1) currentIndex = (currentIndex + 1) % filteredCards.length;
-      renderCard();
-    }
-
-    function updateBoxCounts() {
-      const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, m: 0 };
-      cards.forEach(c => {
-        const b = c.box || 1;
-        if (b >= 6) counts.m++;
-        else counts[b]++;
-      });
-      document.getElementById('b1-count').textContent = counts[1];
-      document.getElementById('b2-count').textContent = counts[2];
-      document.getElementById('b3-count').textContent = counts[3];
-      document.getElementById('b4-count').textContent = counts[4];
-      document.getElementById('b5-count').textContent = counts[5];
-      document.getElementById('bm-count').textContent = counts.m;
-    }
-
-    function triggerImport() { document.getElementById('import-modal').classList.remove('hidden'); }
-    function closeImportModal() { document.getElementById('import-modal').classList.add('hidden'); }
-    function processImport() {
-      try {
-        const parsed = JSON.parse(document.getElementById('import-textarea').value);
-        const list = Array.isArray(parsed) ? parsed : [parsed];
-        list.forEach(i => cards.push({ book: i.book || 'General', prompt: i.prompt, answer: i.answer, box: 1, interval: 1, easeFactor: 2.5 }));
-        saveData(); updateBookshelf(); populateBookSelects(); applyFilter(); closeImportModal();
-      } catch(e) { alert("Invalid JSON syntax."); }
-    }
-
-    function exportData() {
-      const blob = new Blob([JSON.stringify({ cards, characters, chapters }, null, 2)], { type: 'application/json' });
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'literature_studio_backup.json'; a.click();
-    }
-
-    function resetApp() {
-      if (confirm("Delete ALL cards, characters, and chapters permanently?")) {
-        localStorage.clear(); cards = []; characters = []; chapters = [];
-        saveData(); window.location.reload();
-      }
-    }
-
-
-    /* ==========================================================================
-       MODULE 2 LOGIC: CHARACTER MAPPING
-       ========================================================================== */
-    function renderCharacterGrid() {
-      const grid = document.getElementById('character-grid');
-      const filterBook = document.getElementById('character-book-filter').value;
-      const search = document.getElementById('character-search').value.toLowerCase();
-
-      grid.innerHTML = '';
-      const filtered = characters.filter(c => {
-        const matchBook = filterBook === 'ALL' || c.book === filterBook;
-        const matchSearch = (c.name || '').toLowerCase().includes(search) || (c.role || '').toLowerCase().includes(search);
-        return matchBook && matchSearch;
-      });
-
-      if (filtered.length === 0) {
-        grid.innerHTML = '<div style="color:var(--text-muted); padding:20px;">No characters found. Click "+ Add New Character" to create one.</div>';
-        return;
-      }
-
-      filtered.forEach(c => {
-        const card = document.createElement('div');
-        card.className = 'character-card';
-        
-        let relTags = '';
-        if (c.relationships) {
-          relTags = c.relationships.split(',').map(r => `<span class="relationship-tag">🔗 ${r.trim()}</span>`).join('');
-        }
-
-        card.innerHTML = `
-          <div class="character-header">
-            ${c.avatar ? `<img src="${c.avatar}" class="character-avatar">` : `<div class="character-avatar">${c.name.charAt(0)}</div>`}
-            <div class="character-title">
-              <h4>${c.name}</h4>
-              <span>${c.book || 'Unassigned'} • ${c.role || 'Character'}</span>
+        <div class="chapter-content">
+            <div class="text-editor" id="chapter-text" contenteditable="true" placeholder="Start typing your review, notes, and summaries here..." oninput="triggerSave()"></div>
+            <div class="canvas-container">
+                <div class="canvas-toolbar">
+                    <button id="tool-pen" class="active" onclick="setTool('pen')">✏️ Pen</button>
+                    <button id="tool-eraser" onclick="setTool('eraser')">🧽 Eraser</button>
+                    <input type="color" id="pen-color" value="#ffffff" onchange="triggerSave()">
+                    <input type="range" id="pen-width" min="1" max="20" value="3" onchange="triggerSave()">
+                    <div class="flex-spacer"></div>
+                    <button onclick="clearCanvas()">🗑️ Clear</button>
+                </div>
+                <canvas id="drawing-canvas"></canvas>
             </div>
-          </div>
-          <div class="character-body">${c.description || 'No description provided.'}</div>
-          <div class="relationship-tag-list">${relTags}</div>
-          <div class="card-actions">
-            <button onclick="editCharacter('${c.id}')" style="padding:4px 8px; font-size:0.75rem;">Edit</button>
-            <button onclick="deleteCharacter('${c.id}')" style="padding:4px 8px; font-size:0.75rem; background:#dc2626; color:white; border:none;">Delete</button>
-          </div>
-        `;
-        grid.appendChild(card);
-      });
-    }
+        </div>
+    </main>
 
-    function openAddCharacterModal() {
-      document.getElementById('character-modal-title').textContent = "Add New Character";
-      document.getElementById('character-edit-id').value = "";
-      document.getElementById('char-book').value = "";
-      document.getElementById('char-name').value = "";
-      document.getElementById('char-role').value = "";
-      document.getElementById('char-avatar').value = "";
-      document.getElementById('char-desc').value = "";
-      document.getElementById('char-rel').value = "";
-      document.getElementById('character-modal').classList.remove('hidden');
-    }
-
-    function editCharacter(id) {
-      const c = characters.find(item => item.id === id);
-      if (!c) return;
-      document.getElementById('character-modal-title').textContent = "Edit Character";
-      document.getElementById('character-edit-id').value = c.id;
-      document.getElementById('char-book').value = c.book || "";
-      document.getElementById('char-name').value = c.name || "";
-      document.getElementById('char-role').value = c.role || "";
-      document.getElementById('char-avatar').value = c.avatar || "";
-      document.getElementById('char-desc').value = c.description || "";
-      document.getElementById('char-rel').value = c.relationships || "";
-      document.getElementById('character-modal').classList.remove('hidden');
-    }
-
-    function closeCharacterModal() { document.getElementById('character-modal').classList.add('hidden'); }
-
-    function saveCharacter() {
-      const id = document.getElementById('character-edit-id').value || 'char_' + Date.now();
-      const book = document.getElementById('char-book').value.trim();
-      const name = document.getElementById('char-name').value.trim();
-      
-      if (!name) { alert("Character name is required."); return; }
-
-      const charObj = {
-        id, book, name,
-        role: document.getElementById('char-role').value.trim(),
-        avatar: document.getElementById('char-avatar').value.trim(),
-        description: document.getElementById('char-desc').value.trim(),
-        relationships: document.getElementById('char-rel').value.trim()
-      };
-
-      const idx = characters.findIndex(c => c.id === id);
-      if (idx >= 0) characters[idx] = charObj;
-      else characters.push(charObj);
-
-      saveData(); populateBookSelects(); renderCharacterGrid(); closeCharacterModal();
-    }
-
-    function deleteCharacter(id) {
-      if (confirm("Delete character?")) {
-        characters = characters.filter(c => c.id !== id);
-        saveData(); renderCharacterGrid();
-      }
-    }
-
-
-    /* ==========================================================================
-       MODULE 3 LOGIC: CHAPTER REVIEWS
-       ========================================================================== */
-    function renderChapterList() {
-      const container = document.getElementById('chapter-list');
-      const filterBook = document.getElementById('chapter-book-filter').value;
-      const search = document.getElementById('chapter-search').value.toLowerCase();
-
-      container.innerHTML = '';
-      const filtered = chapters.filter(c => {
-        const matchBook = filterBook === 'ALL' || c.book === filterBook;
-        const matchSearch = (c.title || '').toLowerCase().includes(search) || (c.summary || '').toLowerCase().includes(search);
-        return matchBook && matchSearch;
-      });
-
-      if (filtered.length === 0) {
-        container.innerHTML = '<div style="color:var(--text-muted); padding:20px;">No chapter reviews found. Click "+ Add New Chapter" to create one.</div>';
-        return;
-      }
-
-      filtered.forEach(c => {
-        const card = document.createElement('div');
-        card.className = 'chapter-card';
-
-        let quotesHtml = '';
-        if (c.quotes && c.quotes.length > 0) {
-          quotesHtml = c.quotes.map(q => `<div class="quote-box">"${q}"</div>`).join('');
-        }
-
-        let linksHtml = '';
-        if (c.links && c.links.length > 0) {
-          linksHtml = '<ul class="links-list">' + c.links.map(l => `<li>🔗 <a href="${l.url}" target="_blank">${l.label}</a></li>`).join('') + '</ul>';
-        }
-
-        card.innerHTML = `
-          <div class="chapter-card-header">
-            <div class="chapter-title-group">
-              <h4>Chapter ${c.number || '1'}: ${c.title}</h4>
-              <span>${c.book || 'Unassigned'}</span>
+    <!-- Character Map View -->
+    <main id="map-view" class="view">
+        <div class="section-header">
+            <h2>Character Map</h2>
+            <a href="#" class="btn gemini-btn gemini-link" target="_blank">Launch Gemini Notebook</a>
+        </div>
+        <div class="map-container">
+            <div id="network-canvas"></div>
+            <div class="sidebar">
+                <h3>Character Details</h3>
+                <input type="hidden" id="node-id">
+                <label>Name:</label>
+                <input type="text" id="node-label" oninput="updateNodeUI()">
+                <label>Role/Description:</label>
+                <input type="text" id="node-role" oninput="updateNodeUI()">
+                <label>Notes:</label>
+                <textarea id="node-notes" oninput="updateNodeUI()"></textarea>
+                <button onclick="saveNodeData()" style="background:var(--accent);">Save Node Data</button>
             </div>
+        </div>
+    </main>
+
+    <!-- Flashcard View -->
+    <main id="flashcard-view" class="view">
+        <div class="section-header">
+            <h2>Ebbinghaus Studio</h2>
             <div>
-              <button onclick="editChapter('${c.id}')" style="padding:4px 8px; font-size:0.75rem;">Edit</button>
-              <button onclick="deleteChapter('${c.id}')" style="padding:4px 8px; font-size:0.75rem; background:#dc2626; color:white; border:none;">Delete</button>
+                <select id="study-mode" style="padding:8px; border-radius:6px; background:#111; color:#fff; border:1px solid var(--border); margin-right:10px;">
+                    <option value="active">Active Recall</option>
+                    <option value="feynman">Feynman Mode</option>
+                    <option value="cloze">Cloze Deletion</option>
+                </select>
+                <a href="#" class="btn gemini-btn gemini-link" target="_blank">Launch Gemini Notebook</a>
             </div>
-          </div>
-          <div>
-            <div class="chapter-section-title">Summary & Analysis</div>
-            <div style="font-size:0.88rem; color:var(--text-main); line-height:1.5;">${c.summary || 'No summary entered.'}</div>
-          </div>
-          ${quotesHtml ? `<div><div class="chapter-section-title">Key Quotes</div>${quotesHtml}</div>` : ''}
-          ${linksHtml ? `<div><div class="chapter-section-title">Analysis & External Links</div>${linksHtml}</div>` : ''}
+        </div>
+        <div class="fc-container">
+            <div class="fc-stats">
+                <div><span id="stat-due">0</span>Due Cards</div>
+                <div><span id="stat-b1">0</span>Box 1</div>
+                <div><span id="stat-b2">0</span>Box 2</div>
+                <div><span id="stat-b3">0</span>Box 3</div>
+                <div><span id="stat-mastered">0</span>Mastered</div>
+            </div>
+            
+            <button onclick="addFlashcard()">+ Add New Card</button>
+
+            <div class="card" id="active-card" onclick="flipCard()">
+                <div id="card-content">No due cards! You're all caught up.</div>
+            </div>
+            
+            <div class="card-controls" id="card-controls" style="display:none;">
+                <button class="btn-hard" onclick="gradeCard(1)">Hard (Soon)</button>
+                <button class="btn-good" onclick="gradeCard(2)">Good (SM-2)</button>
+                <button class="btn-easy" onclick="gradeCard(3)">Easy (Master)</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Library Center Modal -->
+    <div class="modal-overlay" id="library-modal">
+        <div class="modal">
+            <h2>📚 Library Center</h2>
+            <div class="modal-body">
+                <button onclick="createSnapshot()" style="background:var(--accent);">📸 Create Backup Snapshot Now</button>
+                <button onclick="exportData()">💾 Export Full JSON Backup</button>
+                <hr style="border-color:#333;">
+                <label>Import JSON Backup:</label>
+                <input type="file" accept=".json" onchange="importData(event)">
+                <hr style="border-color:#333;">
+                <h3>Recovery Snapshots</h3>
+                <div class="snapshot-list" id="snapshot-list"></div>
+                <button onclick="closeLibrary()" style="margin-top:10px;">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        // --- INLINE SERVICE WORKER (PWA OFFLINE CACHING) ---
+        const swCode = `
+            const CACHE = 'pandora-v1';
+            self.addEventListener('install', e => {
+                e.waitUntil(caches.open(CACHE).then(c => c.addAll([
+                    '/',
+                    'https://unpkg.com/vis-network/standalone/umd/vis-network.min.js'
+                ])));
+                self.skipWaiting();
+            });
+            self.addEventListener('fetch', e => {
+                if (e.request.url.startsWith('freeform://')) return; // Ignore custom schemes
+                e.respondWith(
+                    caches.match(e.request).then(res => res || fetch(e.request).then(fetchRes => {
+                        return caches.open(CACHE).then(c => {
+                            if (e.request.url.startsWith('http')) c.put(e.request, fetchRes.clone());
+                            return fetchRes;
+                        });
+                    }))
+                );
+            });
         `;
-        container.appendChild(card);
-      });
-    }
+        const blob = new Blob([swCode], { type: 'application/javascript' });
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(err => console.log("SW Error:", err));
+        }
 
-    function openAddChapterModal() {
-      document.getElementById('chapter-modal-title').textContent = "Add Chapter Review";
-      document.getElementById('chapter-edit-id').value = "";
-      document.getElementById('chap-book').value = "";
-      document.getElementById('chap-num').value = "1";
-      document.getElementById('chap-title').value = "";
-      document.getElementById('chap-summary').value = "";
-      document.getElementById('chap-quotes').value = "";
-      document.getElementById('chap-links').value = "";
-      document.getElementById('chapter-modal').classList.remove('hidden');
-    }
+        // --- GLOBAL STATE & PROTOCOLS ---
+        let state = {
+            wallpaper: null,
+            activeBookId: null,
+            books: {} // Format: { id: { title, notebookUrl, chapterText, canvasData, nodes, edges, flashcards } }
+        };
 
-    function editChapter(id) {
-      const c = chapters.find(item => item.id === id);
-      if (!c) return;
-      document.getElementById('chapter-modal-title').textContent = "Edit Chapter Review";
-      document.getElementById('chapter-edit-id').value = c.id;
-      document.getElementById('chap-book').value = c.book || "";
-      document.getElementById('chap-num').value = c.number || "1";
-      document.getElementById('chap-title').value = c.title || "";
-      document.getElementById('chap-summary').value = c.summary || "";
-      document.getElementById('chap-quotes').value = c.quotes ? c.quotes.join('\n') : "";
-      document.getElementById('chap-links').value = c.links ? c.links.map(l => `${l.label} | ${l.url}`).join('\n') : "";
-      document.getElementById('chapter-modal').classList.remove('hidden');
-    }
+        // --- CORE INITIATION ---
+        window.onload = () => {
+            loadState();
+            initNavigation();
+            initCanvas();
+            renderBookSelector();
+            if (state.activeBookId) loadBook(state.activeBookId);
+            applyWallpaper();
+        };
 
-    function closeChapterModal() { document.getElementById('chapter-modal').classList.add('hidden'); }
+        // --- LIVE STATE LOCALSTORAGE SYNC ---
+        function triggerSave() {
+            if (!state.activeBookId) return;
+            const b = state.books[state.activeBookId];
+            b.chapterText = document.getElementById('chapter-text').innerHTML;
+            b.canvasData = canvas.toDataURL();
+            localStorage.setItem('pandora_box_state', JSON.stringify(state));
+        }
 
-    function saveChapter() {
-      const id = document.getElementById('chapter-edit-id').value || 'chap_' + Date.now();
-      const book = document.getElementById('chap-book').value.trim();
-      const title = document.getElementById('chap-title').value.trim();
+        function loadState() {
+            const saved = localStorage.getItem('pandora_box_state');
+            if (saved) state = JSON.parse(saved);
+        }
 
-      if (!title) { alert("Chapter title is required."); return; }
+        // --- NAVIGATION & UI ---
+        function initNavigation() {
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+                    e.target.classList.add('active');
+                    const target = document.getElementById(e.target.dataset.target);
+                    target.classList.add('active');
+                    
+                    if (e.target.dataset.target === 'map-view' && network) network.redraw();
+                    if (e.target.dataset.target === 'flashcard-view') renderFlashcard();
+                });
+            });
+        }
 
-      const quotesRaw = document.getElementById('chap-quotes').value.trim();
-      const quotes = quotesRaw ? quotesRaw.split('\n').filter(Boolean) : [];
+        function applyWallpaper() {
+            if (state.wallpaper) {
+                document.getElementById('home-view').style.backgroundImage = `url(${state.wallpaper})`;
+            }
+        }
 
-      const linksRaw = document.getElementById('chap-links').value.trim();
-      const links = linksRaw ? linksRaw.split('\n').filter(Boolean).map(line => {
-        const parts = line.split('|');
-        return { label: parts[0] ? parts[0].trim() : 'Resource Link', url: parts[1] ? parts[1].trim() : '#' };
-      }) : [];
+        function handleWallpaper(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                state.wallpaper = event.target.result;
+                applyWallpaper();
+                triggerSave();
+            };
+            reader.readAsDataURL(file);
+        }
 
-      const chapObj = {
-        id, book, title,
-        number: document.getElementById('chap-num').value,
-        summary: document.getElementById('chap-summary').value.trim(),
-        quotes, links
-      };
+        // --- BOOK MANAGEMENT ---
+        function createNewBook() {
+            createSnapshot(); // Auto-snapshot before major changes
+            const title = prompt("Enter Book Title:");
+            if (!title) return;
+            const notebookUrl = prompt("Enter Gemini Notebook URL for this book (optional):") || "#";
+            
+            const id = 'book_' + Date.now();
+            
+            // Generate 10 Default Nodes
+            const defaultNodes = Array.from({length: 10}, (_, i) => ({
+                id: i + 1, label: `Character ${i + 1}`, role: '', notes: ''
+            }));
+            const defaultEdges = Array.from({length: 9}, (_, i) => ({
+                from: 1, to: i + 2
+            }));
 
-      const idx = chapters.findIndex(c => c.id === id);
-      if (idx >= 0) chapters[idx] = chapObj;
-      else chapters.push(chapObj);
+            state.books[id] = {
+                title, notebookUrl, chapterText: '', canvasData: null,
+                nodes: defaultNodes, edges: defaultEdges, flashcards: []
+            };
+            
+            state.activeBookId = id;
+            renderBookSelector();
+            loadBook(id);
+            triggerSave();
+        }
 
-      saveData(); populateBookSelects(); renderChapterList(); closeChapterModal();
-    }
+        function renderBookSelector() {
+            const sel = document.getElementById('book-selector');
+            sel.innerHTML = '<option value="">-- Select a Book --</option>';
+            Object.keys(state.books).forEach(id => {
+                const opt = document.createElement('option');
+                opt.value = id; opt.textContent = state.books[id].title;
+                if (id === state.activeBookId) opt.selected = true;
+                sel.appendChild(opt);
+            });
+        }
 
-    function deleteChapter(id) {
-      if (confirm("Delete chapter review?")) {
-        chapters = chapters.filter(c => c.id !== id);
-        saveData(); renderChapterList();
-      }
-    }
+        function switchBook() {
+            const sel = document.getElementById('book-selector');
+            if (sel.value) {
+                state.activeBookId = sel.value;
+                loadBook(sel.value);
+                triggerSave();
+            }
+        }
 
-    // Modal Helpers
-    function openInterleaveModal() { document.getElementById('interleave-modal').classList.remove('hidden'); }
-    function closeInterleaveModal() { document.getElementById('interleave-modal').classList.add('hidden'); }
-    function applyInterleavedSelection() { closeInterleaveModal(); }
-    function openCardManager() { document.getElementById('card-manager-modal').classList.remove('hidden'); }
-    function closeCardManager() { document.getElementById('card-manager-modal').classList.add('hidden'); }
-    function openAddCardModal() { document.getElementById('edit-card-modal').classList.remove('hidden'); }
-    function closeEditModal() { document.getElementById('edit-card-modal').classList.add('hidden'); }
-    function saveCardEdit() { closeEditModal(); }
-  </script>
+        function loadBook(id) {
+            const b = state.books[id];
+            if (!b) return;
+            
+            document.getElementById('current-book-label').textContent = b.title;
+            
+            // Dynamic Gemini Links
+            document.querySelectorAll('.gemini-link').forEach(link => {
+                link.href = b.notebookUrl;
+                link.style.display = (b.notebookUrl && b.notebookUrl !== "#") ? 'inline-block' : 'none';
+            });
+
+            // Chapter Review
+            document.getElementById('chapter-text').innerHTML = b.chapterText || '';
+            if (b.canvasData) {
+                const img = new Image();
+                img.onload = () => { ctx.clearRect(0,0, canvas.width, canvas.height); ctx.drawImage(img, 0, 0); };
+                img.src = b.canvasData;
+            } else {
+                ctx.clearRect(0,0, canvas.width, canvas.height);
+            }
+
+            // Map
+            initMap(b.nodes, b.edges);
+            
+            // Flashcards
+            activeCardData = null;
+            renderFlashcard();
+        }
+
+        // --- APPLE PENCIL CANVAS ENGINE ---
+        const canvas = document.getElementById('drawing-canvas');
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false, currentTool = 'pen';
+
+        function initCanvas() {
+            // Resize handler
+            const resize = () => {
+                const temp = canvas.toDataURL();
+                canvas.width = canvas.parentElement.clientWidth;
+                canvas.height = canvas.parentElement.clientHeight - 50; // minus toolbar
+                const img = new Image();
+                img.onload = () => ctx.drawImage(img, 0, 0);
+                img.src = temp;
+            };
+            window.addEventListener('resize', resize);
+            setTimeout(resize, 100);
+
+            // Pointer Events for Apple Pencil Pressure
+            canvas.addEventListener('pointerdown', e => {
+                isDrawing = true;
+                ctx.beginPath();
+                ctx.moveTo(e.offsetX, e.offsetY);
+                e.preventDefault();
+            });
+
+            canvas.addEventListener('pointermove', e => {
+                if (!isDrawing) return;
+                const baseWidth = document.getElementById('pen-width').value;
+                const pressure = e.pressure !== 0.5 ? e.pressure : 1; // Apple pencil pressure
+                ctx.lineWidth = baseWidth * pressure * 2;
+                ctx.lineCap = 'round';
+                
+                if (currentTool === 'eraser') {
+                    ctx.globalCompositeOperation = 'destination-out';
+                    ctx.strokeStyle = "rgba(0,0,0,1)";
+                } else {
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.strokeStyle = document.getElementById('pen-color').value;
+                }
+                
+                ctx.lineTo(e.offsetX, e.offsetY);
+                ctx.stroke();
+                e.preventDefault();
+            });
+
+            canvas.addEventListener('pointerup', () => { isDrawing = false; triggerSave(); });
+            canvas.addEventListener('pointerout', () => { isDrawing = false; });
+        }
+
+        function setTool(tool) {
+            currentTool = tool;
+            document.getElementById('tool-pen').classList.toggle('active', tool === 'pen');
+            document.getElementById('tool-eraser').classList.toggle('active', tool === 'eraser');
+        }
+        function clearCanvas() {
+            ctx.clearRect(0,0, canvas.width, canvas.height);
+            triggerSave();
+        }
+
+        // --- VIS NETWORK CHARACTER MAP ---
+        let network = null;
+        let nodesDataset, edgesDataset;
+
+        function initMap(nodeData, edgeData) {
+            nodesDataset = new vis.DataSet(nodeData);
+            edgesDataset = new vis.DataSet(edgeData);
+            const container = document.getElementById('network-canvas');
+            const data = { nodes: nodesDataset, edges: edgesDataset };
+            const options = {
+                nodes: { shape: 'dot', size: 20, font: { color: '#ffffff' }, color: { background: 'var(--accent)', border: '#ffffff' } },
+                edges: { width: 2, color: '#888' },
+                physics: { stabilization: false, barnesHut: { springLength: 200 } }
+            };
+            
+            if (network) network.destroy();
+            network = new vis.Network(container, data, options);
+
+            // Sidebar binding
+            network.on("selectNode", function (params) {
+                const nodeId = params.nodes[0];
+                const node = nodesDataset.get(nodeId);
+                document.getElementById('node-id').value = node.id;
+                document.getElementById('node-label').value = node.label || '';
+                document.getElementById('node-role').value = node.role || '';
+                document.getElementById('node-notes').value = node.notes || '';
+            });
+            network.on("deselectNode", function () {
+                document.getElementById('node-id').value = '';
+                document.getElementById('node-label').value = '';
+                document.getElementById('node-role').value = '';
+                document.getElementById('node-notes').value = '';
+            });
+
+            // Save map positions on drag end
+            network.on("dragEnd", () => {
+                saveMapState();
+            });
+        }
+
+        function updateNodeUI() {
+            const id = document.getElementById('node-id').value;
+            if (!id) return;
+            nodesDataset.update({
+                id: parseInt(id),
+                label: document.getElementById('node-label').value,
+                role: document.getElementById('node-role').value,
+                notes: document.getElementById('node-notes').value
+            });
+        }
+
+        function saveNodeData() {
+            saveMapState();
+            alert("Character saved!");
+        }
+
+        function saveMapState() {
+            if (!state.activeBookId) return;
+            state.books[state.activeBookId].nodes = nodesDataset.get();
+            state.books[state.activeBookId].edges = edgesDataset.get();
+            triggerSave();
+        }
+
+        // --- EBBINGHAUS FLASHCARD ENGINE (SM-2) ---
+        let activeCardData = null;
+        let isFlipped = false;
+
+        function addFlashcard() {
+            if (!state.activeBookId) return alert("Select a book first.");
+            const front = prompt("Card Front (Question/Concept):");
+            if (!front) return;
+            const back = prompt("Card Back (Answer):");
+            if (!back) return;
+            
+            const card = {
+                id: Date.now(),
+                front, back,
+                box: 1, // Leitner box (1-5, 6=Mastered)
+                interval: 0, 
+                repetition: 0, 
+                easeFactor: 2.5,
+                dueDate: Date.now()
+            };
+            state.books[state.activeBookId].flashcards.push(card);
+            triggerSave();
+            renderFlashcard();
+        }
+
+        function calculateSM2(quality, card) {
+            // quality: 1 (Hard/Fail), 2 (Good), 3 (Easy)
+            if (quality === 1) {
+                card.repetition = 0;
+                card.interval = 1;
+                card.box = 1;
+            } else {
+                if (card.repetition === 0) card.interval = 1;
+                else if (card.repetition === 1) card.interval = 6;
+                else card.interval = Math.round(card.interval * card.easeFactor);
+                
+                card.repetition += 1;
+                card.box = Math.min(card.box + 1, 6);
+            }
+            
+            // Adjust ease factor
+            const qSM2 = quality === 1 ? 0 : quality === 2 ? 3 : 5; // map to SM2 0-5 scale roughly
+            card.easeFactor = card.easeFactor + (0.1 - (5 - qSM2) * (0.08 + (5 - qSM2) * 0.02));
+            if (card.easeFactor < 1.3) card.easeFactor = 1.3;
+            
+            // Set next due date (interval in days -> ms)
+            card.dueDate = Date.now() + (card.interval * 24 * 60 * 60 * 1000);
+            return card;
+        }
+
+        function renderFlashcard() {
+            if (!state.activeBookId) return;
+            const cards = state.books[state.activeBookId].flashcards || [];
+            
+            // Update Stats
+            const now = Date.now();
+            let dueCount = 0, b1=0, b2=0, b3=0, mastered=0;
+            
+            cards.forEach(c => {
+                if (c.dueDate <= now && c.box < 6) dueCount++;
+                if (c.box === 1) b1++;
+                else if (c.box === 2) b2++;
+                else if (c.box === 3) b3++;
+                else if (c.box >= 6) mastered++;
+            });
+            
+            document.getElementById('stat-due').textContent = dueCount;
+            document.getElementById('stat-b1').textContent = b1;
+            document.getElementById('stat-b2').textContent = b2;
+            document.getElementById('stat-b3').textContent = b3;
+            document.getElementById('stat-mastered').textContent = mastered;
+
+            // Get Next Due Card
+            const dueCards = cards.filter(c => c.dueDate <= now && c.box < 6).sort((a,b) => a.dueDate - b.dueDate);
+            
+            isFlipped = false;
+            document.getElementById('card-controls').style.display = 'none';
+            const display = document.getElementById('card-content');
+            
+            if (dueCards.length > 0) {
+                activeCardData = dueCards[0];
+                
+                // Handle Study Modes
+                const mode = document.getElementById('study-mode').value;
+                if (mode === 'cloze' && activeCardData.front.includes('...')) {
+                    display.innerHTML = `<i>Fill in the blank:</i><br><br>${activeCardData.front}`;
+                } else if (mode === 'feynman') {
+                    display.innerHTML = `<i>Explain this simply:</i><br><br><b>${activeCardData.front}</b>`;
+                } else {
+                    display.innerHTML = activeCardData.front;
+                }
+            } else {
+                activeCardData = null;
+                display.innerHTML = "🎉 No due cards! You're all caught up.";
+            }
+        }
+
+        function flipCard() {
+            if (!activeCardData || isFlipped) return;
+            isFlipped = true;
+            document.getElementById('card-content').innerHTML = `
+                <div style="font-size:16px; color:#aaa; margin-bottom:15px;">${activeCardData.front}</div>
+                <hr style="border:0; height:1px; background:var(--border); margin:15px 0; width:100%;">
+                <div>${activeCardData.back}</div>
+            `;
+            document.getElementById('card-controls').style.display = 'flex';
+        }
+
+        function gradeCard(quality) {
+            if (!activeCardData) return;
+            calculateSM2(quality, activeCardData);
+            triggerSave();
+            renderFlashcard();
+        }
+
+        // --- DISASTER RECOVERY & LIBRARY CENTER ---
+        function openLibrary() {
+            document.getElementById('library-modal').style.display = 'flex';
+            renderSnapshots();
+        }
+        function closeLibrary() {
+            document.getElementById('library-modal').style.display = 'none';
+        }
+
+        function createSnapshot() {
+            const timestamp = new Date().toLocaleString();
+            const snapId = 'pandora_snapshot_' + Date.now();
+            localStorage.setItem(snapId, JSON.stringify({ time: timestamp, data: state }));
+            alert("Snapshot created: " + timestamp);
+            renderSnapshots();
+        }
+
+        function renderSnapshots() {
+            const list = document.getElementById('snapshot-list');
+            list.innerHTML = '';
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.startsWith('pandora_snapshot_')) {
+                    const snap = JSON.parse(localStorage.getItem(key));
+                    list.innerHTML += `
+                        <div class="snapshot-item">
+                            <span>${snap.time}</span>
+                            <button onclick="restoreSnapshot('${key}')">Restore</button>
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        function restoreSnapshot(key) {
+            if (confirm("WARNING: This will overwrite your current live state. Proceed?")) {
+                const snap = JSON.parse(localStorage.getItem(key));
+                state = snap.data;
+                triggerSave();
+                window.location.reload();
+            }
+        }
+
+        function exportData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("download", "pandoras_box_backup.json");
+            dlAnchorElem.click();
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            if (confirm("Importing will overwrite your current state. Did you take a snapshot first?")) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        state = JSON.parse(e.target.result);
+                        triggerSave();
+                        alert("Import successful! Reloading...");
+                        window.location.reload();
+                    } catch (err) {
+                        alert("Invalid JSON file.");
+                    }
+                };
+                reader.readAsText(file);
+            }
+        }
+    </script>
 </body>
 </html>
