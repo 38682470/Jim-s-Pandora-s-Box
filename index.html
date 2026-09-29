@@ -559,14 +559,24 @@
         default: { border: '#f59e0b', background: '#1e293b' }
       };
 
-     // Ensure map re-renders correctly when tab is clicked with fallback book binding
-document.querySelector('[data-target="map-view"]').addEventListener('click', () => {
-  if (!PandoraState.activeBookId) {
-    const firstBookKey = Object.keys(PandoraState.books)[0];
-    if (firstBookKey) PandoraState.activeBookId = firstBookKey;
+   function renderCharacterMap() {
+  // Bulletproof auto-fallback if activeBookId is missing
+  if (!PandoraState.activeBookId || !PandoraState.books[PandoraState.activeBookId]) {
+    const bookKeys = Object.keys(PandoraState.books);
+    if (bookKeys.length > 0) {
+      PandoraState.activeBookId = bookKeys[0];
+    }
   }
-  setTimeout(() => renderCharacterMap(), 50);
-});
+
+  const activeId = PandoraState.activeBookId;
+  const layout = document.getElementById('cmap-active-layout');
+  const placeholder = document.getElementById('cmap-placeholder');
+
+  if (!activeId || !PandoraState.books[activeId]) {
+    layout.style.display = 'none';
+    placeholder.style.display = 'flex';
+    return;
+  }
 
       function renderCharacterMap() {
         const activeId = PandoraState.activeBookId;
