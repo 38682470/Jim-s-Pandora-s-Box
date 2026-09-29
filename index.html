@@ -165,11 +165,257 @@
        MODULE 2 PLACEHOLDER (CHAPTER REVIEW & CANVAS)
        ===================================================== -->
   <main id="chapter-view" class="view-section">
-    <div style="padding:40px; text-align:center; color:var(--text-muted);">
-      <h2>Chapter Review Module Pending</h2>
-      <p>This section will be generated in Turn 3.</p>
+   <!-- =====================================================
+         CHAPTER REVIEW & APPLE PENCIL CANVAS MODULE
+         ===================================================== -->
+    
+    <style>
+      /* Chapter Review Split Layout */
+      .chapter-container { display: flex; height: 100%; width: 100%; background: var(--bg-main); overflow: hidden; }
+      
+      /* Left Panel: Rich Text */
+      .chapter-text-panel { flex: 1; display: flex; flex-direction: column; border-right: 1px solid var(--border-color); background: var(--bg-inner); max-width: 50%; }
+      
+      /* Right Panel: Apple Pencil Canvas */
+      .chapter-canvas-panel { flex: 1; display: flex; flex-direction: column; background: var(--bg-card); position: relative; }
+      
+      .chapter-toolbar { background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border-color); padding: 12px 15px; display: flex; gap: 10px; align-items: center; z-index: 5; flex-wrap: wrap; }
+      .chapter-toolbar h3 { color: var(--accent-color); font-size: 1rem; margin-right: auto; }
+      
+      /* Rich Text Editor */
+      .text-editor { flex: 1; padding: 25px; color: var(--text-main); font-size: 1.05rem; line-height: 1.6; outline: none; overflow-y: auto; }
+      .text-editor:empty:before { content: attr(placeholder); color: var(--text-muted); pointer-events: none; font-style: italic; }
+      
+      /* Canvas Element */
+      .canvas-wrapper { flex: 1; position: relative; overflow: hidden; width: 100%; height: 100%; touch-action: none; }
+      #apple-pencil-canvas { position: absolute; top: 0; left: 0; cursor: crosshair; touch-action: none; /* Disables native scrolling for Pencil drawing */ }
+      
+      /* Canvas Tools */
+      .tool-btn { background: var(--bg-inner); color: var(--text-main); border: 1px solid var(--border-color); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: bold; display: flex; align-items: center; gap: 4px; }
+      .tool-btn.active { background: var(--accent-color); color: #000; border-color: var(--accent-color); }
+      .tool-btn:hover { background: #334155; }
+      
+      .color-swatch { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: transform 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+      .color-swatch.active { border-color: #fff; transform: scale(1.2); }
+      
+      /* Placeholder State */
+      #chapter-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; width: 100%; color: var(--text-muted); text-align: center; padding: 40px; }
+    </style>
+
+    <div id="chapter-placeholder">
+      <h2 style="color:var(--text-muted); margin-bottom:10px;">Chapter Review Inactive</h2>
+      <p>Please select an active book from the Home tab to access the notes and drawing canvas.</p>
     </div>
-    <!-- MODULE 2: CHAPTER REVIEW & CANVAS GOES HERE -->
+
+    <div id="chapter-active-layout" class="chapter-container" style="display: none;">
+      
+      <!-- LEFT PANEL: Text Editor -->
+      <div class="chapter-text-panel">
+        <div class="chapter-toolbar">
+          <h3>📝 Chapter Notes & Summaries</h3>
+          <button class="tool-btn" onclick="document.execCommand('bold', false, null)"><b>B</b></button>
+          <button class="tool-btn" onclick="document.execCommand('italic', false, null)"><i>I</i></button>
+          <button class="tool-btn" onclick="document.execCommand('insertUnorderedList', false, null)">• List</button>
+          <button class="pandora-btn" style="background:var(--accent-color); color:#000; margin-left: auto;" onclick="saveChapterData()">💾 Save All</button>
+        </div>
+        <div id="chapter-text-editor" class="text-editor" contenteditable="true" placeholder="Type chapter summaries, thematic analyses, or reading notes here..."></div>
+      </div>
+
+      <!-- RIGHT PANEL: Apple Pencil Canvas -->
+      <div class="chapter-canvas-panel">
+        <div class="chapter-toolbar">
+          <div style="font-size: 0.85rem; font-weight: bold; color: var(--text-muted); margin-right: 10px;">✏️ Canvas Tools:</div>
+          
+          <button class="tool-btn active" id="tool-pen" onclick="setCanvasTool('pen')">Pen</button>
+          <button class="tool-btn" id="tool-eraser" onclick="setCanvasTool('eraser')">Eraser</button>
+          
+          <div style="width: 1px; height: 20px; background: var(--border-color); margin: 0 5px;"></div>
+          
+          <div class="color-swatch active" style="background: #f8fafc;" onclick="setCanvasColor('#f8fafc', this)"></div>
+          <div class="color-swatch" style="background: #ef4444;" onclick="setCanvasColor('#ef4444', this)"></div>
+          <div class="color-swatch" style="background: #3b82f6;" onclick="setCanvasColor('#3b82f6', this)"></div>
+          <div class="color-swatch" style="background: #10b981;" onclick="setCanvasColor('#10b981', this)"></div>
+          <div class="color-swatch" style="background: #f59e0b;" onclick="setCanvasColor('#f59e0b', this)"></div>
+          
+          <div class="flex-spacer"></div>
+          <button class="tool-btn" style="color: #ef4444; border-color: #ef4444;" onclick="clearCanvas()">🗑️ Clear</button>
+        </div>
+        
+        <div class="canvas-wrapper" id="canvas-container">
+          <canvas id="apple-pencil-canvas"></canvas>
+        </div>
+      </div>
+      
+    </div>
+
+    <script>
+      const canvas = document.getElementById('apple-pencil-canvas');
+      const ctx = canvas.getContext('2d', { desynchronized: true }); // Optimizes for Apple Pencil low-latency rendering
+      const container = document.getElementById('canvas-container');
+      
+      let isDrawing = false;
+      let currentTool = 'pen'; 
+      let currentColor = '#f8fafc';
+      let baseLineWidth = 2.5;
+
+      // Ensure view re-renders and resizes correctly when tab is clicked
+      document.querySelector('[data-target="chapter-view"]').addEventListener('click', () => {
+        setTimeout(() => loadChapterData(), 50);
+      });
+
+      function loadChapterData() {
+        const activeId = PandoraState.activeBookId;
+        const layout = document.getElementById('chapter-active-layout');
+        const placeholder = document.getElementById('chapter-placeholder');
+
+        if (!activeId) {
+          layout.style.display = 'none';
+          placeholder.style.display = 'flex';
+          return;
+        }
+
+        layout.style.display = 'flex';
+        placeholder.style.display = 'none';
+
+        const book = PandoraState.books[activeId];
+
+        // Load Text
+        document.getElementById('chapter-text-editor').innerHTML = book.chapterText || "";
+
+        // Resize Canvas to match physical container (supports Retina displays)
+        resizeCanvas();
+
+        // Load Canvas Image Data
+        if (book.canvasData) {
+          const img = new Image();
+          img.onload = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width / window.devicePixelRatio, canvas.height / window.devicePixelRatio);
+          };
+          img.src = book.canvasData;
+        } else {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+      }
+
+      function resizeCanvas() {
+        const rect = container.getBoundingClientRect();
+        // Multiply by devicePixelRatio for Retina iPad sharpness
+        canvas.width = rect.width * window.devicePixelRatio;
+        canvas.height = rect.height * window.devicePixelRatio;
+        canvas.style.width = `${rect.width}px`;
+        canvas.style.height = `${rect.height}px`;
+        // Scale context to match CSS pixels
+        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+      }
+
+      // Handle window resize/iPad orientation changes
+      window.addEventListener('resize', () => {
+        if (document.getElementById('chapter-active-layout').style.display === 'flex') {
+          // Backup drawing, resize, then restore
+          const backup = canvas.toDataURL();
+          resizeCanvas();
+          const img = new Image();
+          img.onload = () => ctx.drawImage(img, 0, 0, canvas.width / window.devicePixelRatio, canvas.height / window.devicePixelRatio);
+          img.src = backup;
+        }
+      });
+
+      // Canvas Tools Logistics
+      function setCanvasTool(tool) {
+        currentTool = tool;
+        document.getElementById('tool-pen').classList.remove('active');
+        document.getElementById('tool-eraser').classList.remove('active');
+        document.getElementById(`tool-${tool}`).classList.add('active');
+      }
+
+      function setCanvasColor(color, element) {
+        currentColor = color;
+        setCanvasTool('pen');
+        document.querySelectorAll('.color-swatch').forEach(el => el.classList.remove('active'));
+        element.classList.add('active');
+      }
+
+      function clearCanvas() {
+        if (confirm("Clear the entire drawing canvas? This cannot be undone.")) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+      }
+
+      // Apple Pencil Pointer Events (Mapping Pressure to Stroke Width)
+      function startPosition(e) {
+        isDrawing = true;
+        draw(e);
+      }
+
+      function endPosition() {
+        isDrawing = false;
+        ctx.beginPath(); // Resets path so next stroke doesn't connect
+      }
+
+      function draw(e) {
+        if (!isDrawing) return;
+        e.preventDefault(); // Prevents iPad scrolling while drawing
+
+        // Extract Pointer coordinates relative to canvas
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        // Apple Pencil Pressure mapping (fallback to 0.5 for mouse)
+        let pressure = e.pressure !== undefined ? e.pressure : 0.5;
+        if (pressure === 0) pressure = 0.5;
+
+        ctx.lineWidth = currentTool === 'eraser' ? 25 * (pressure + 0.5) : baseLineWidth + (pressure * 5);
+
+        if (currentTool === 'eraser') {
+          // 'destination-out' actually erases the pixels to transparent rather than painting over them
+          ctx.globalCompositeOperation = 'destination-out';
+          ctx.strokeStyle = 'rgba(0,0,0,1)';
+        } else {
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.strokeStyle = currentColor;
+        }
+
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+      }
+
+      // Event Listeners for Apple Pencil / Touch / Mouse
+      canvas.addEventListener('pointerdown', startPosition);
+      canvas.addEventListener('pointermove', draw);
+      canvas.addEventListener('pointerup', endPosition);
+      canvas.addEventListener('pointerout', endPosition);
+
+      // Save Data to PandoraState
+      function saveChapterData() {
+        const activeId = PandoraState.activeBookId;
+        if (!activeId) return;
+        
+        const editorHtml = document.getElementById('chapter-text-editor').innerHTML;
+        const canvasB64 = canvas.toDataURL('image/png'); // Saves transparent PNG data
+        
+        PandoraState.books[activeId].chapterText = editorHtml;
+        PandoraState.books[activeId].canvasData = canvasB64;
+        
+        saveGlobalState(); // Master function from Turn 1
+        
+        // Provide visual feedback
+        const btn = document.querySelector('.chapter-toolbar .pandora-btn');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = "✅ Saved!";
+        btn.style.background = "#10b981";
+        setTimeout(() => {
+          btn.innerHTML = originalText;
+          btn.style.background = "var(--accent-color)";
+        }, 2000);
+      }
+    </script>
   </main>
 
   <!-- =====================================================
