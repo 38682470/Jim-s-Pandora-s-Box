@@ -425,7 +425,9 @@
    <!-- =====================================================
          CHARACTER MAP MODULE (SELF-CONTAINED BULLETPROOF ENGINE)
          ===================================================== -->
-    
+    <div id="map-view" class="view-section">
+  <canvas id="character-map-canvas" width="800" height="600"></canvas>
+</div>
     <!-- Vis.js Graph Engine CDN -->
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 
@@ -522,253 +524,771 @@
       </div>
     </div>
 
-    <script>
-      let network = null;
-      let nodesDataset = null;
-      let edgesDataset = null;
-      let isEdgeMode = false;
-      let edgeSourceNode = null;
+/* =====================================================
+   1. GLOBAL STATE INITIALIZATION
+   ===================================================== */
+let PandoraState = JSON.parse(localStorage.getItem('PandoraState_v1')) || {
+  activeBookId: null,
+  globalWallpaper: '',
+  books: {}
+};
+
+/* =====================================================
+   2. CORE SYSTEM & NAVIGATION LOGIC
+   ===================================================== */
+function saveGlobalState() {
+  localStorage.setItem('PandoraState_v1', JSON.stringify(PandoraState));
+  updateGlobalUI();
+}
+
+function initApp() {
+  if (PandoraState.globalWallpaper) {
+    document.body.style.backgroundImage = `url(${PandoraState.globalWallpaper})`;
+  }
+  
+  // Auto-initialize fallback book if empty
+  if (Object.keys(PandoraState.books).length === 0) {
+    const defaultId = 'book_' + Date.now();
+    PandoraState.books[defaultId] = {
+      title: "My First Book", geminiUrl: "", coverImg: "",
+      chapterText: "", canvasData: null, nodes: [], edges: [], flashcards: []
+    };
+    PandoraState.activeBookId = defaultId;
+    saveGlobalState();
+  }
+  
+  renderHomeBooks();
+  updateGlobalUI();
+  initFlashcards();
+  initCharacterMapCanvas();
+}
+
+function updateGlobalUI() {
+  const activeBook = PandoraState.books[PandoraState.activeBookId];
+  const label = document.getElementById('global-book-label');
+  const geminiLink = document.getElementById('global-gemini-link');
+  
+  if (label) {
+    label.innerText = activeBook ? `📖 ${activeBook.title}` : "No Book Selected";
+  }
+  if (geminiLink) {
+    if (activeBook && activeBook.geminiUrl) {
+      geminiLink.href = activeBook.geminiUrl;
+      geminiLink.classList.remove('hidden');
+    } else {
+      geminiLink.classList.add('hidden');
+    }
+  }
+}
+
+// Navigation Tab Switching
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
+    e.target.classList.add('active');
+    
+    const targetId = e.target.dataset.target;
+    const targetEl = document.getElementById(targetId);
+    if (targetEl) targetEl.classList.add('active');
+
+    if (targetId === 'map-view') {
+      renderCharacterMap();
+    }
+  });
+});
+
+/* =====================================================
+   3. HOME VIEW & LIBRARY MANAGEMENT
+   ===================================================== */
+function renderHomeBooks() {
+  const select = document.getElementById('home-book-select');
+  if (!select) return;
+  select.innerHTML = '';
+  Object.keys(PandoraState.books).forEach(id => {
+    const option = document.createElement('option');
+    option.value = id;
+    option.innerText = PandoraState.books[id].title;
+    if (id === PandoraState.activeBookId) option.selected = true;
+    select.appendChild(option);
+  });
+}
+
+function switchActiveBook() {
+  const select = document.getElementById('home-book-select');
+  if (!select) return;
+  PandoraState.activeBookId = select.value;
+  saveGlobalState();
+  
+  if (document.getElementById('map-view')?.classList.contains('active')) {
+    renderCharacterMap();
+  }
+  if (document.getElementById('flashcard-view')?.classList.contains('active')) {
+    initFlashcards();
+  }
+}
+
+function createNewBook() {
+  const title = prompt("Enter new book title:");
+  if (!title) return;
+  const id = 'book_' + Date.now();
+  PandoraState.books[id] = {
+    title: title, geminiUrl: "", coverImg: "",
+    chapterText: "", canvasData: null, nodes: [], edges: [], flashcards: []
+  };
+  PandoraState.activeBookId = id;
+  saveGlobalState();
+  renderHomeBooks();
+  initFlashcards();
+}
+
+function deleteActiveBook() {
+  const activeId = PandoraState.activeBookId;
+  if (!activeId) return;
+  if (confirm(`Are you sure you want to delete "${PandoraState.books[activeId].title}"? This cannot be undone.`)) {
+    delete PandoraState.books[activeId];
+    const remainingKeys = Object.keys(PandoraState.books);
+    PandoraState.activeBookId = remainingKeys.length > 0 ? remainingKeys[0] : null;
+    saveGlobalState();
+    renderHomeBooks();
+    initFlashcards();
+  }
+}
+
+function setGlobalWallpaper(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    PandoraState.globalWallpaper = e.target.result;
+    document.body.style.backgroundImage = `url(${e.target.result})`;
+    saveGlobalState();
+  };
+  reader.readAsDataURL(file);
+}
+
+function editActiveBook() {
+  const activeId = PandoraState.activeBookId;
+  if (!activeId) return alert("No active book.");
+  const book = PandoraState.books[activeId];
+  document.getElementById('bm-title').value = book.title;
+  document.getElementById('bm-url').value = book.geminiUrl || "";
+  document.getElementById('book-modal').style.display = 'flex';
+}
+
+function saveBookMetadata() {
+  const activeId = PandoraState.activeBookId;
+  PandoraState.books[activeId].title = document.getElementById('bm-title').value;
+  PandoraState.books[activeId].geminiUrl = document.getElementById('bm-url').value;
+  
+  const file = document.getElementById('bm-cover-file').files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      PandoraState.books[activeId].coverImg = e.target.result;
+      finishSavingMetadata();
+    };
+    reader.readAsDataURL(file);
+  } else {
+    finishSavingMetadata();
+  }
+}
+
+function finishSavingMetadata() {
+  saveGlobalState();
+  renderHomeBooks();
+  document.getElementById('book-modal').style.display = 'none';
+  initFlashcards();
+}
+
+function openLibraryModal() {
+  document.getElementById('library-modal').style.display = 'flex';
+}
+
+function createSnapshot() {
+  localStorage.setItem(`PandoraState_Backup_${Date.now()}`, JSON.stringify(PandoraState));
+  alert("Local snapshot created successfully.");
+}
+
+function downloadFullBackup() {
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(PandoraState));
+  const dlAnchorElem = document.createElement('a');
+  dlAnchorElem.setAttribute("href", dataStr);
+  dlAnchorElem.setAttribute("download", `Pandora_Backup_${new Date().toISOString().split('T')[0]}.json`);
+  dlAnchorElem.click();
+}
+
+function restoreFromBackup(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const restored = JSON.parse(e.target.result);
+      if (restored && restored.books) {
+        PandoraState = restored;
+        saveGlobalState();
+        alert("Backup restored successfully! Reloading...");
+        location.reload();
+      } else {
+        alert("Invalid backup file format.");
+      }
+    } catch (err) {
+      alert("Error parsing backup file.");
+    }
+  };
+  reader.readAsText(file);
+}
+
+/* =====================================================
+   4. EBBINGHAUS FLASHCARD MODULE (SM-2 ALGORITHM)
+   ===================================================== */
+let fcCurrentMode = 'standard';
+let fcActiveCards = [];
+let fcCurrentCardIndex = 0;
+let fcInterleavedBooks = ['ALL'];
+let fcIsAnswerShowing = false;
+let fcGuardEnabled = false;
+let fcDueOnly = false;
+
+function createEmptyCard(bookId) {
+  return {
+    id: 'fc_' + Date.now() + Math.random().toString(36).substr(2, 5),
+    bookId: bookId,
+    prompt: '', answer: '', cloze: '', image: '',
+    box: 0,
+    easeFactor: 2.5,
+    interval: 0,
+    nextDueDate: Date.now(),
+    history: []
+  };
+}
+
+function initFlashcards() {
+  renderBookshelf();
+  populateFlashcardBookSelect();
+  buildCardPool();
+}
+
+function renderBookshelf() {
+  const shelf = document.getElementById('bookshelf');
+  if (!shelf) return;
+  shelf.innerHTML = '';
+  Object.keys(PandoraState.books).forEach(id => {
+    const book = PandoraState.books[id];
+    const tile = document.createElement('div');
+    tile.className = `book-tile ${id === PandoraState.activeBookId && fcInterleavedBooks.includes('ALL') ? 'active' : ''}`;
+    if (fcInterleavedBooks.includes(id) && !fcInterleavedBooks.includes('ALL')) tile.classList.add('interleaved-selected');
+    
+    tile.onclick = () => {
+      const select = document.getElementById('book-select');
+      if (select) select.value = id;
+      filterByBook(id);
+    };
+
+    if (book.coverImg) {
+      const img = document.createElement('img');
+      img.src = book.coverImg;
+      tile.appendChild(img);
+    } else {
+      const fallback = document.createElement('div');
+      fallback.className = 'book-fallback';
+      fallback.innerText = book.title;
+      tile.appendChild(fallback);
+    }
+    shelf.appendChild(tile);
+  });
+}
+
+function populateFlashcardBookSelect() {
+  const select = document.getElementById('book-select');
+  if (!select) return;
+  const currentVal = select.value;
+  select.innerHTML = '<option value="ALL">All Books Combined (Global Interleaved)</option>';
+  Object.keys(PandoraState.books).forEach(id => {
+    const option = document.createElement('option');
+    option.value = id;
+    option.innerText = PandoraState.books[id].title;
+    select.appendChild(option);
+  });
+  if (document.querySelector(`#book-select option[value="${currentVal}"]`)) {
+    select.value = currentVal;
+  }
+}
+
+function filterByBook(val) {
+  fcInterleavedBooks = [val];
+  renderBookshelf();
+  buildCardPool();
+}
+
+function toggleDueFilter() {
+  fcDueOnly = !fcDueOnly;
+  const btn = document.getElementById('btn-due-toggle');
+  if (btn) {
+    btn.style.background = fcDueOnly ? '#dc2626' : 'var(--bg-card)';
+    btn.style.color = fcDueOnly ? '#fff' : 'var(--text-main)';
+  }
+  buildCardPool();
+}
+
+function toggleGuard(checked) { fcGuardEnabled = checked; }
+
+function openInterleaveModal() {
+  const container = document.getElementById('interleave-checkboxes');
+  if (!container) return;
+  container.innerHTML = '';
+  Object.keys(PandoraState.books).forEach(id => {
+    const book = PandoraState.books[id];
+    const label = document.createElement('label');
+    label.style.display = 'flex'; label.style.alignItems = 'center'; label.style.gap = '8px';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.value = id;
+    if (fcInterleavedBooks.includes(id) || fcInterleavedBooks.includes('ALL')) cb.checked = true;
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(book.title));
+    container.appendChild(label);
+  });
+  document.getElementById('interleave-modal').style.display = 'flex';
+}
+
+function applyInterleavedSelection() {
+  const checked = Array.from(document.querySelectorAll('#interleave-checkboxes input:checked')).map(cb => cb.value);
+  if (checked.length === 0) { alert("Select at least one book."); return; }
+  fcInterleavedBooks = checked;
+  const select = document.getElementById('book-select');
+  if (select) select.value = checked.length === Object.keys(PandoraState.books).length ? 'ALL' : checked[0];
+  document.getElementById('interleave-modal').style.display = 'none';
+  renderBookshelf();
+  buildCardPool();
+}
+
+function setMode(mode) {
+  fcCurrentMode = mode;
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+  document.getElementById(`tab-${mode}`)?.classList.add('active');
+  
+  document.getElementById('mode-feynman-panel')?.classList.add('hidden');
+  document.getElementById('mode-cloze-panel')?.classList.add('hidden');
+  document.getElementById('mode-standard-panel')?.classList.add('hidden');
+  document.getElementById(`mode-${mode}-panel`)?.classList.remove('hidden');
+  
+  if (fcIsAnswerShowing) {
+    document.getElementById('model-answer')?.classList.remove('hidden');
+    document.getElementById('anki-controls')?.classList.remove('hidden');
+  }
+}
+
+function buildCardPool() {
+  fcActiveCards = [];
+  let allCards = [];
+  
+  const targetBooks = fcInterleavedBooks.includes('ALL') ? Object.keys(PandoraState.books) : fcInterleavedBooks;
+  targetBooks.forEach(bookId => {
+    if (PandoraState.books[bookId] && PandoraState.books[bookId].flashcards) {
+      allCards = allCards.concat(PandoraState.books[bookId].flashcards);
+    }
+  });
+
+  updateLeitnerStats(allCards);
+
+  const now = Date.now();
+  fcActiveCards = fcDueOnly ? allCards.filter(c => c.nextDueDate <= now) : allCards;
+  fcActiveCards.sort(() => Math.random() - 0.5);
+  
+  fcCurrentCardIndex = 0;
+  renderNextCard();
+}
+
+function updateLeitnerStats(cards) {
+  const stats = { due: 0, b1: 0, b2: 0, b3: 0, b4: 0, b5: 0, bm: 0 };
+  const now = Date.now();
+  
+  cards.forEach(c => {
+    if (c.nextDueDate <= now && c.box !== 6) stats.due++;
+    if (c.box === 0 || c.box === 1) stats.b1++;
+    else if (c.box === 2) stats.b2++;
+    else if (c.box === 3) stats.b3++;
+    else if (c.box === 4) stats.b4++;
+    else if (c.box === 5) stats.b5++;
+    else if (c.box >= 6) stats.bm++;
+  });
+
+  ['due', 'b1', 'b2', 'b3', 'b4', 'b5', 'bm'].forEach(key => {
+    const el = document.getElementById(`${key}-count`);
+    if (el) el.innerText = stats[key];
+  });
+}
+
+function renderNextCard() {
+  fcIsAnswerShowing = false;
+  document.getElementById('model-answer')?.classList.add('hidden');
+  document.getElementById('anki-controls')?.classList.add('hidden');
+  document.querySelectorAll('.reveal-btn').forEach(btn => btn.style.display = 'block');
+  
+  const feynmanIn = document.getElementById('feynman-input');
+  if (feynmanIn) feynmanIn.value = '';
+
+  if (fcActiveCards.length === 0 || fcCurrentCardIndex >= fcActiveCards.length) {
+    document.getElementById('card-prompt').innerHTML = "🎉 All caught up! No cards in this view.";
+    document.getElementById('card-book-title').innerText = "SESSION COMPLETE";
+    document.getElementById('card-counter').innerText = "Q0/0";
+    document.getElementById('card-box-label').innerText = "-";
+    document.getElementById('card-due-status').innerText = "";
+    document.querySelectorAll('.reveal-btn').forEach(btn => btn.style.display = 'none');
+    return;
+  }
+
+  const card = fcActiveCards[fcCurrentCardIndex];
+  const book = PandoraState.books[card.bookId];
+  
+  document.getElementById('card-book-title').innerText = book ? book.title.toUpperCase() : "UNKNOWN BOOK";
+  document.getElementById('card-counter').innerText = `Q${fcCurrentCardIndex + 1}/${fcActiveCards.length}`;
+  document.getElementById('card-box-label').innerText = card.box >= 6 ? 'MASTERED' : `BOX ${card.box === 0 ? 1 : card.box}`;
+  
+  const isDue = card.nextDueDate <= Date.now();
+  const dueStatus = document.getElementById('card-due-status');
+  if (dueStatus) {
+    dueStatus.innerText = isDue ? '🔴 Due Now' : '🟢 Not Due';
+    dueStatus.style.color = isDue ? '#ef4444' : '#10b981';
+  }
+
+  if (fcCurrentMode === 'cloze' && card.cloze) {
+    const regex = new RegExp(card.cloze, 'gi');
+    document.getElementById('card-prompt').innerHTML = card.prompt.replace(regex, '___[?]___');
+  } else {
+    document.getElementById('card-prompt').innerText = card.prompt;
+  }
+}
+
+function toggleAnswer() {
+  if (fcGuardEnabled) {
+    document.querySelectorAll('.reveal-btn').forEach(btn => btn.innerText = "Processing (3s Guard)...");
+    setTimeout(revealActualAnswer, 3000);
+  } else {
+    revealActualAnswer();
+  }
+}
+
+function revealActualAnswer() {
+  fcIsAnswerShowing = true;
+  const card = fcActiveCards[fcCurrentCardIndex];
+  const answerBox = document.getElementById('model-answer');
+  
+  if (answerBox) {
+    if (fcCurrentMode === 'cloze' && card.cloze) {
+      answerBox.innerHTML = `<strong>Target:</strong> <span class="cloze-target">${card.cloze}</span><br><br>${card.answer}`;
+    } else {
+      answerBox.innerHTML = card.answer;
+    }
+    answerBox.classList.remove('hidden');
+  }
+  
+  document.querySelectorAll('.reveal-btn').forEach(btn => btn.style.display = 'none');
+  document.getElementById('anki-controls')?.classList.remove('hidden');
+}
+
+function rateCard(ratingStr) {
+  const card = fcActiveCards[fcCurrentCardIndex];
+  let grade = 0;
+
+  if (ratingStr === 'again') grade = 0;
+  if (ratingStr === 'hard') grade = 1;
+  if (ratingStr === 'good') grade = 2;
+  if (ratingStr === 'easy') grade = 3;
+
+  if (grade === 0) {
+    card.box = 1;
+    card.interval = 1;
+    card.easeFactor = Math.max(1.3, card.easeFactor - 0.2);
+  } else if (grade === 1) {
+    card.interval = card.interval === 0 ? 1 : card.interval * 1.2;
+    card.easeFactor = Math.max(1.3, card.easeFactor - 0.15);
+  } else if (grade === 2) {
+    card.box += 1;
+    if (card.interval === 0) card.interval = 1;
+    else if (card.interval === 1) card.interval = 6;
+    else card.interval = Math.round(card.interval * card.easeFactor);
+  } else if (grade === 3) {
+    card.box += 2;
+    card.easeFactor += 0.15;
+    if (card.interval === 0) card.interval = 4;
+    else if (card.interval === 1) card.interval = 10;
+    else card.interval = Math.round(card.interval * card.easeFactor * 1.3);
+  }
+
+  if (card.box > 6) card.box = 6;
+  card.nextDueDate = Date.now() + (card.interval * 24 * 60 * 60 * 1000);
+  card.history.push({ grade: grade, time: Date.now() });
+
+  saveGlobalState();
+  fcCurrentCardIndex++;
+  
+  let allCards = [];
+  const targetBooks = fcInterleavedBooks.includes('ALL') ? Object.keys(PandoraState.books) : fcInterleavedBooks;
+  targetBooks.forEach(bookId => { if (PandoraState.books[bookId]) allCards = allCards.concat(PandoraState.books[bookId].flashcards); });
+  updateLeitnerStats(allCards);
+
+  renderNextCard();
+}
+
+function openCardManager() {
+  renderCardManagerList();
+  document.getElementById('card-manager-modal').style.display = 'flex';
+}
+
+function renderCardManagerList() {
+  const container = document.getElementById('card-manager-list');
+  if (!container) return;
+  container.innerHTML = '';
+  
+  const targetBooks = fcInterleavedBooks.includes('ALL') ? Object.keys(PandoraState.books) : fcInterleavedBooks;
+  
+  targetBooks.forEach(bookId => {
+    const book = PandoraState.books[bookId];
+    if (!book || !book.flashcards) return;
+    
+    book.flashcards.forEach(card => {
+      const div = document.createElement('div');
+      div.style.padding = '10px'; div.style.borderBottom = '1px solid var(--border-color)';
+      div.style.display = 'flex'; div.style.justifyContent = 'space-between'; div.style.alignItems = 'center';
       
-      const FactionColors = {
-        protagonist: { border: '#2563eb', background: '#1e3a8a', highlight: { border: '#60a5fa', background: '#1e3a8a' } },
-        antagonist: { border: '#dc2626', background: '#7f1d1d', highlight: { border: '#f87171', background: '#7f1d1d' } },
-        supporting: { border: '#16a34a', background: '#14532d', highlight: { border: '#4ade80', background: '#14532d' } },
-        neutral: { border: '#d97706', background: '#78350f', highlight: { border: '#fbbf24', background: '#78350f' } },
-        location: { border: '#7c3aed', background: '#4c1d95', highlight: { border: '#a78bfa', background: '#4c1d95' } },
-        default: { border: '#f59e0b', background: '#1e293b' }
-      };
+      const textDiv = document.createElement('div');
+      textDiv.innerHTML = `<strong>${book.title}</strong><br><span style="font-size:0.8rem; color:var(--text-muted);">${card.prompt.substring(0, 50)}...</span>`;
+      
+      const btnGroup = document.createElement('div');
+      btnGroup.style.display = 'flex'; btnGroup.style.gap = '5px';
+      
+      const editBtn = document.createElement('button');
+      editBtn.className = 'fc-btn'; editBtn.innerText = 'Edit';
+      editBtn.onclick = () => openEditCardModal(card, book.title);
+      
+      const delBtn = document.createElement('button');
+      delBtn.className = 'fc-btn'; delBtn.style.color = '#ef4444'; delBtn.innerText = 'Del';
+      delBtn.onclick = () => deleteCard(bookId, card.id);
+      
+      btnGroup.appendChild(editBtn); btnGroup.appendChild(delBtn);
+      div.appendChild(textDiv); div.appendChild(btnGroup);
+      container.appendChild(div);
+    });
+  });
+}
 
-      // Bulletproof global hook on tab click
-      document.querySelectorAll('[data-target="map-view"]').forEach(el => {
-        el.addEventListener('click', () => {
-          setTimeout(() => renderCharacterMap(), 50);
-        });
-      });
+function openAddCardModal() {
+  const bookId = PandoraState.activeBookId;
+  if (!bookId) return alert("Select an active book first.");
+  document.getElementById('edit-modal-title').innerText = "Add New Card";
+  document.getElementById('edit-card-id').value = "";
+  document.getElementById('edit-card-book').value = PandoraState.books[bookId].title;
+  document.getElementById('edit-card-prompt').value = "";
+  document.getElementById('edit-card-answer').value = "";
+  document.getElementById('edit-card-cloze').value = "";
+  document.getElementById('edit-card-modal').style.display = 'flex';
+}
 
-      function renderCharacterMap() {
-        // Ensure PandoraState exists
-        if (typeof PandoraState === 'undefined') {
-          window.PandoraState = { activeBookId: 'default_book', books: {} };
-        }
-        
-        if (!PandoraState.activeBookId || !PandoraState.books[PandoraState.activeBookId]) {
-          const keys = Object.keys(PandoraState.books);
-          if (keys.length > 0) {
-            PandoraState.activeBookId = keys[0];
-          } else {
-            PandoraState.activeBookId = 'book_' + Date.now();
-            PandoraState.books[PandoraState.activeBookId] = { title: 'Default Book', nodes: [], edges: [], flashcards: [] };
-          }
-        }
+function openEditCardModal(card, bookTitle) {
+  document.getElementById('edit-modal-title').innerText = "Edit Card";
+  document.getElementById('edit-card-id').value = card.id;
+  document.getElementById('edit-card-book').value = bookTitle;
+  document.getElementById('edit-card-prompt').value = card.prompt;
+  document.getElementById('edit-card-answer').value = card.answer;
+  document.getElementById('edit-card-cloze').value = card.cloze || "";
+  document.getElementById('edit-card-modal').style.display = 'flex';
+}
 
-        const book = PandoraState.books[PandoraState.activeBookId];
-        
-        // Inject 10-node template if empty
-        if (!book.nodes || book.nodes.length === 0) {
-          book.nodes = [
-            { id: 'peter', label: 'Peter Andersson', title: 'General Manager', group: 'neutral', value: 40, color: FactionColors.neutral },
-            { id: 'kira', label: 'Kira Andersson', title: 'Spouse', group: 'protagonist', value: 30, color: FactionColors.protagonist },
-            { id: 'benji', label: 'Benji', title: 'Player', group: 'supporting', value: 30, color: FactionColors.supporting },
-            { id: 'char4', label: 'Character 4', group: 'neutral', value: 25, color: FactionColors.neutral },
-            { id: 'char5', label: 'Character 5', group: 'neutral', value: 25, color: FactionColors.neutral },
-            { id: 'char6', label: 'Character 6', group: 'neutral', value: 25, color: FactionColors.neutral },
-            { id: 'char7', label: 'Character 7', group: 'neutral', value: 25, color: FactionColors.neutral },
-            { id: 'char8', label: 'Character 8', group: 'neutral', value: 25, color: FactionColors.neutral },
-            { id: 'char9', label: 'Character 9', group: 'neutral', value: 25, color: FactionColors.neutral },
-            { id: 'char10', label: 'Character 10', group: 'neutral', value: 25, color: FactionColors.neutral }
-          ];
-          book.edges = [
-            { from: 'peter', to: 'kira', label: 'Spouse' },
-            { from: 'peter', to: 'benji', label: 'Player' },
-            { from: 'peter', to: 'char4' }, { from: 'peter', to: 'char5' },
-            { from: 'peter', to: 'char6' }, { from: 'peter', to: 'char7' },
-            { from: 'peter', to: 'char8' }, { from: 'peter', to: 'char9' },
-            { from: 'peter', to: 'char10' }
-          ];
-        }
+function saveCardEdit() {
+  const cardId = document.getElementById('edit-card-id').value;
+  const promptText = document.getElementById('edit-card-prompt').value;
+  const answerText = document.getElementById('edit-card-answer').value;
+  const clozeText = document.getElementById('edit-card-cloze').value;
+  
+  if (!promptText || !answerText) return alert("Prompt and Answer are required.");
 
-        nodesDataset = new vis.DataSet(book.nodes);
-        edgesDataset = new vis.DataSet(book.edges);
-
-        const container = document.getElementById('network-canvas');
-        const data = { nodes: nodesDataset, edges: edgesDataset };
-
-        const options = {
-          nodes: {
-            shape: 'dot', borderWidth: 3, borderWidthSelected: 5,
-            font: { color: '#f8fafc', size: 14, face: '-apple-system', strokeWidth: 3, strokeColor: '#0f172a' },
-            shadow: { enabled: true, color: 'rgba(0,0,0,0.6)', size: 10, x: 5, y: 5 }
-          },
-          edges: {
-            width: 2, selectionWidth: 3, color: { color: '#64748b', highlight: '#f59e0b' },
-            font: { color: '#94a3b8', size: 12, strokeWidth: 2, strokeColor: '#0f172a', align: 'top' },
-            smooth: { type: 'continuous' }, arrows: { to: { enabled: true, scaleFactor: 0.5 } }
-          },
-          physics: {
-            enabled: true, stabilization: false,
-            barnesHut: {
-              gravitationalConstant: parseInt(document.getElementById('phys-gravity').value),
-              centralGravity: 0.15,
-              springLength: parseInt(document.getElementById('phys-springs').value),
-              springConstant: 0.04, damping: 0.09
-            }
-          },
-          interaction: { hover: true, tooltipDelay: 200 }
-        };
-
-        if (network) network.destroy();
-        network = new vis.Network(container, data, options);
-
-        setTimeout(() => {
-          if (network) { network.redraw(); network.fit(); }
-        }, 150);
-
-        network.on("selectNode", function (params) {
-          if (isEdgeMode) handleEdgeCreation(params.nodes[0]);
-          else populateSidebarNode(params.nodes[0]);
-        });
-        network.on("selectEdge", function (params) {
-          if (params.nodes.length === 0) populateSidebarEdge(params.edges[0]);
-        });
-        network.on("deselectNode", function () { clearSidebar(); });
+  if (cardId) {
+    Object.keys(PandoraState.books).forEach(bId => {
+      const cards = PandoraState.books[bId].flashcards;
+      const idx = cards.findIndex(c => c.id === cardId);
+      if (idx > -1) {
+        cards[idx].prompt = promptText;
+        cards[idx].answer = answerText;
+        cards[idx].cloze = clozeText;
       }
+    });
+  } else {
+    const bookId = PandoraState.activeBookId;
+    if (!PandoraState.books[bookId].flashcards) PandoraState.books[bookId].flashcards = [];
+    const newCard = createEmptyCard(bookId);
+    newCard.prompt = promptText;
+    newCard.answer = answerText;
+    newCard.cloze = clozeText;
+    PandoraState.books[bookId].flashcards.push(newCard);
+  }
 
-      function updatePhysics() {
-        if (!network) return;
-        network.setOptions({
-          physics: {
-            barnesHut: {
-              gravitationalConstant: parseInt(document.getElementById('phys-gravity').value),
-              springLength: parseInt(document.getElementById('phys-springs').value)
-            }
-          }
-        });
+  saveGlobalState();
+  document.getElementById('edit-card-modal').style.display = 'none';
+  renderCardManagerList();
+  buildCardPool();
+}
+
+function deleteCard(bookId, cardId) {
+  if (confirm("Delete this flashcard?")) {
+    const cards = PandoraState.books[bookId].flashcards;
+    const idx = cards.findIndex(c => c.id === cardId);
+    if (idx > -1) {
+      cards.splice(idx, 1);
+      saveGlobalState();
+      renderCardManagerList();
+      buildCardPool();
+    }
+  }
+}
+
+/* =====================================================
+   5. CHARACTER MAPPING MODULE (CANVAS ENGINE)
+   ===================================================== */
+let mapCanvas = null;
+let mapCtx = null;
+let draggedNode = null;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
+
+function initCharacterMapCanvas(canvasId = 'character-map-canvas') {
+  mapCanvas = document.getElementById(canvasId);
+  if (!mapCanvas) return;
+  mapCtx = mapCanvas.getContext('2d');
+
+  mapCanvas.addEventListener('mousedown', handleMapMouseDown);
+  mapCanvas.addEventListener('mousemove', handleMapMouseMove);
+  mapCanvas.addEventListener('mouseup', handleMapMouseUp);
+}
+
+function renderCharacterMap() {
+  if (!mapCanvas || !mapCtx) {
+    initCharacterMapCanvas();
+    if (!mapCanvas) return;
+  }
+
+  const activeBook = PandoraState.books[PandoraState.activeBookId];
+  if (!activeBook) return;
+
+  if (!activeBook.nodes) activeBook.nodes = [];
+  if (!activeBook.edges) activeBook.edges = [];
+
+  mapCtx.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
+
+  // Draw Relationships (Edges)
+  activeBook.edges.forEach(edge => {
+    const sourceNode = activeBook.nodes.find(n => n.id === edge.from);
+    const targetNode = activeBook.nodes.find(n => n.id === edge.to);
+
+    if (sourceNode && targetNode) {
+      mapCtx.beginPath();
+      mapCtx.moveTo(sourceNode.x, sourceNode.y);
+      mapCtx.lineTo(targetNode.x, targetNode.y);
+      mapCtx.strokeStyle = '#64748b';
+      mapCtx.lineWidth = 2;
+      mapCtx.stroke();
+
+      if (edge.label) {
+        const midX = (sourceNode.x + targetNode.x) / 2;
+        const midY = (sourceNode.y + targetNode.y) / 2;
+        mapCtx.fillStyle = '#f8fafc';
+        mapCtx.fillRect(midX - 20, midY - 10, 40, 20);
+        mapCtx.fillStyle = '#0f172a';
+        mapCtx.font = '10px sans-serif';
+        mapCtx.textAlign = 'center';
+        mapCtx.textBaseline = 'middle';
+        mapCtx.fillText(edge.label, midX, midY);
       }
+    }
+  });
 
-      function toggleEdgeMode() {
-        isEdgeMode = !isEdgeMode;
-        const btn = document.getElementById('btn-link-mode');
-        const banner = document.getElementById('edge-banner');
-        if (isEdgeMode) {
-          btn.style.background = '#3b82f6'; btn.style.color = '#fff';
-          banner.style.display = 'block';
-          edgeSourceNode = network.getSelectedNodes()[0] || null;
-        } else {
-          btn.style.background = 'var(--bg-card)'; btn.style.color = 'var(--text-main)';
-          banner.style.display = 'none'; edgeSourceNode = null;
-        }
-      }
+  // Draw Characters (Nodes)
+  activeBook.nodes.forEach(node => {
+    mapCtx.beginPath();
+    mapCtx.arc(node.x, node.y, 25, 0, 2 * Math.PI);
+    mapCtx.fillStyle = node.color || '#3b82f6';
+    mapCtx.fill();
+    mapCtx.lineWidth = 2;
+    mapCtx.strokeStyle = '#1e293b';
+    mapCtx.stroke();
 
-      function handleEdgeCreation(targetNodeId) {
-        if (!edgeSourceNode) {
-          edgeSourceNode = targetNodeId;
-          document.getElementById('edge-banner').innerText = "🔗 Source selected. Click target node to link...";
-          return;
-        }
-        if (edgeSourceNode === targetNodeId) { toggleEdgeMode(); return; }
-        const label = prompt("Enter relationship description (e.g. 'Sibling', 'Enemies'):");
-        if (label !== null) {
-          edgesDataset.add({ id: 'edge_' + Date.now(), from: edgeSourceNode, to: targetNodeId, label: label });
-          syncMapStateToPandora();
-        }
-        toggleEdgeMode();
-      }
+    mapCtx.fillStyle = '#ffffff';
+    mapCtx.font = '12px sans-serif';
+    mapCtx.textAlign = 'center';
+    mapCtx.textBaseline = 'middle';
+    mapCtx.fillText(node.label.substring(0, 8), node.x, node.y);
+  });
+}
 
-      function clearSidebar() {
-        document.getElementById('sidebar-title').innerText = "Character Details";
-        document.getElementById('sidebar-id').innerText = "";
-        document.getElementById('node-id').value = "";
-        document.getElementById('node-label').value = "";
-        document.getElementById('node-title').value = "";
-        document.getElementById('node-group').value = "neutral";
-        document.getElementById('node-size').value = 30;
-        document.getElementById('node-size-val').innerText = "30";
-        document.getElementById('node-image').value = "";
-        document.getElementById('node-notes').value = "";
-      }
+function addCharacterNode(label, x = 100, y = 100, color = '#3b82f6') {
+  const activeBook = PandoraState.books[PandoraState.activeBookId];
+  if (!activeBook) return;
 
-      function populateSidebarNode(nodeId) {
-        const node = nodesDataset.get(nodeId);
-        if (!node) return;
-        document.getElementById('sidebar-title').innerText = "Edit Character";
-        document.getElementById('sidebar-id').innerText = `ID: ${node.id.substring(0,8)}...`;
-        document.getElementById('node-id').value = node.id;
-        document.getElementById('node-label').value = node.label || "";
-        document.getElementById('node-title').value = node.title || "";
-        document.getElementById('node-group').value = node.group || "neutral";
-        document.getElementById('node-size').value = node.value || 30;
-        document.getElementById('node-size-val').innerText = node.value || 30;
-        document.getElementById('node-image').value = (node.shape === 'circularImage') ? node.image : "";
-        document.getElementById('node-notes').value = node.notes || "";
-      }
+  const newNode = {
+    id: 'node_' + Date.now(),
+    label: label || 'New Character',
+    x: x,
+    y: y,
+    color: color
+  };
 
-      function populateSidebarEdge(edgeId) {
-        clearSidebar();
-        const edge = edgesDataset.get(edgeId);
-        if (!edge) return;
-        document.getElementById('sidebar-title').innerText = "Edit Relationship";
-        document.getElementById('sidebar-id').innerText = `Edge: ${edgeId.substring(0,8)}...`;
-        document.getElementById('node-id').value = edge.id;
-        document.getElementById('node-label').value = edge.label || "";
-      }
+  activeBook.nodes.push(newNode);
+  saveGlobalState();
+  renderCharacterMap();
+}
 
-      function addNewCharacter() {
-        const newId = 'node_' + Date.now();
-        nodesDataset.add({ id: newId, label: "New Character", group: "neutral", value: 30, color: FactionColors.neutral });
-        syncMapStateToPandora();
-        network.selectNodes([newId]);
-        populateSidebarNode(newId);
-      }
+function addCharacterEdge(fromNodeId, toNodeId, label = '') {
+  const activeBook = PandoraState.books[PandoraState.activeBookId];
+  if (!activeBook) return;
 
-      function saveSelectedNode() {
-        const id = document.getElementById('node-id').value;
-        if (!id) return;
-        const label = document.getElementById('node-label').value;
-        if (id.startsWith('edge_')) {
-          edgesDataset.update({ id: id, label: label });
-        } else {
-          const group = document.getElementById('node-group').value;
-          const title = document.getElementById('node-title').value;
-          const val = parseInt(document.getElementById('node-size').value);
-          const img = document.getElementById('node-image').value;
-          const notes = document.getElementById('node-notes').value;
-          const updatedNode = {
-            id: id, label: label, title: title, group: group, value: val, notes: notes,
-            color: FactionColors[group] || FactionColors.default
-          };
-          if (img) { updatedNode.shape = 'circularImage'; updatedNode.image = img; }
-          else { updatedNode.shape = 'dot'; }
-          nodesDataset.update(updatedNode);
-        }
-        syncMapStateToPandora();
-      }
+  activeBook.edges.push({
+    id: 'edge_' + Date.now(),
+    from: fromNodeId,
+    to: toNodeId,
+    label: label
+  });
 
-      function deleteSelectedElement() {
-        const selectedNodes = network.getSelectedNodes();
-        const selectedEdges = network.getSelectedEdges();
-        if (selectedNodes.length === 0 && selectedEdges.length === 0) return;
-        if (confirm("Delete selected item(s)?")) {
-          if (selectedNodes.length > 0) nodesDataset.remove(selectedNodes);
-          if (selectedEdges.length > 0) edgesDataset.remove(selectedEdges);
-          clearSidebar();
-          syncMapStateToPandora();
-        }
-      }
+  saveGlobalState();
+  renderCharacterMap();
+}
 
-      function syncMapStateToPandora() {
-        const activeId = PandoraState.activeBookId;
-        if (activeId && nodesDataset && edgesDataset) {
-          PandoraState.books[activeId].nodes = nodesDataset.get();
-          PandoraState.books[activeId].edges = edgesDataset.get();
-          if (typeof saveGlobalState === 'function') saveGlobalState();
-        }
-      }
+function handleMapMouseDown(e) {
+  const rect = mapCanvas.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
 
-      // Auto-trigger on page load if map view is active
-      window.addEventListener('load', () => {
-        setTimeout(() => renderCharacterMap(), 200);
-      });
-    </script>
+  const activeBook = PandoraState.books[PandoraState.activeBookId];
+  if (!activeBook || !activeBook.nodes) return;
+
+  draggedNode = activeBook.nodes.find(node => {
+    const dist = Math.hypot(node.x - mouseX, node.y - mouseY);
+    return dist <= 25;
+  });
+
+  if (draggedNode) {
+    dragOffsetX = mouseX - draggedNode.x;
+    dragOffsetY = mouseY - draggedNode.y;
+  }
+}
+
+function handleMapMouseMove(e) {
+  if (!draggedNode) return;
+  const rect = mapCanvas.getBoundingClientRect();
+  draggedNode.x = (e.clientX - rect.left) - dragOffsetX;
+  draggedNode.y = (e.clientY - rect.top) - dragOffsetY;
+  renderCharacterMap();
+}
+
+function handleMapMouseUp() {
+  if (draggedNode) {
+    draggedNode = null;
+    saveGlobalState();
+  }
+}
+
+/* Initialize application loop */
+window.addEventListener('DOMContentLoaded', initApp);
     <script>
       let network = null;
       let nodesDataset = null;
