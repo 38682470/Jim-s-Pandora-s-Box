@@ -417,2064 +417,382 @@
       }
     </script>
   </main>
-
-  <!-- =====================================================
-       MODULE 3 PLACEHOLDER (CHARACTER MAP)
-       ===================================================== -->
-  <main id="map-view" class="view-section">
-   <!-- =====================================================
-         CHARACTER MAP MODULE (SELF-CONTAINED BULLETPROOF ENGINE)
-         ===================================================== -->
-
-  <div class="map-controls" style="margin-bottom: 10px; display: flex; gap: 10px;">
-    <button onclick="addCharacterNode(prompt('Enter Character Name:'))">Add Character</button>
-  </div>
-  <canvas id="character-map-canvas" width="800" height="600" style="border: 1px solid #334155; background: #0f172a;"></canvas>
-</div>
-     
-</div>
-    <!-- Vis.js Graph Engine CDN -->
-    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
-
-    <style>
-      .cmap-container { display: flex; height: 100%; width: 100%; background: var(--bg-main); overflow: hidden; position: relative; }
-      .cmap-main { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; }
-      .cmap-sidebar { width: 340px; background: var(--bg-card); border-left: 1px solid var(--border-color); display: flex; flex-direction: column; box-shadow: -5px 0 20px rgba(0,0,0,0.5); z-index: 10; }
-      
-      #network-canvas { flex: 1; width: 100%; height: 100%; position: absolute; top: 0; left: 0; outline: none; }
-      
-      .cmap-toolbar { background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border-color); padding: 10px 15px; display: flex; gap: 15px; align-items: center; z-index: 5; }
-      .cmap-toolbar label { font-size: 0.75rem; color: var(--text-muted); font-weight: bold; display: flex; align-items: center; gap: 8px; }
-      .cmap-toolbar input[type="range"] { accent-color: var(--accent-color); cursor: pointer; }
-      
-      .sidebar-header { padding: 15px; border-bottom: 1px solid var(--border-color); background: var(--bg-inner); display: flex; justify-content: space-between; align-items: center; }
-      .sidebar-header h3 { color: var(--accent-color); font-size: 1.1rem; }
-      .sidebar-content { padding: 15px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 12px; }
-      
-      .cmap-form-group label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; font-weight: bold; }
-      .cmap-input, .cmap-select, .cmap-textarea { width: 100%; background: var(--bg-inner); border: 1px solid var(--border-color); color: var(--text-main); padding: 10px; border-radius: 6px; font-size: 0.9rem; font-family: inherit; }
-      .cmap-textarea { height: 90px; resize: vertical; }
-      
-      .edge-mode-banner { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); background: #3b82f6; color: #fff; padding: 6px 16px; border-radius: 20px; font-weight: bold; font-size: 0.85rem; box-shadow: 0 4px 12px rgba(0,0,0,0.4); display: none; z-index: 20; pointer-events: none; }
-    </style>
-
-    <div id="cmap-active-layout" class="cmap-container">
-      <div class="cmap-main">
-        <div class="edge-mode-banner" id="edge-banner">🔗 Edge Mode: Click target node to connect...</div>
-        
-        <div class="cmap-toolbar">
-          <button class="pandora-btn" style="background:var(--accent-color); color:#000;" onclick="addNewCharacter()">+ New Character</button>
-          <button class="pandora-btn" id="btn-link-mode" onclick="toggleEdgeMode()">🔗 Add Link</button>
-          <div class="flex-spacer"></div>
-          <label title="Adjust relationship spring distance">Springs: 
-            <input type="range" id="phys-springs" min="50" max="400" value="200" oninput="updatePhysics()">
-          </label>
-          <label title="Adjust node repulsion force">Gravity: 
-            <input type="range" id="phys-gravity" min="-5000" max="-500" value="-2500" oninput="updatePhysics()">
-          </label>
-        </div>
-
-        <div id="network-canvas"></div>
-      </div>
-
-      <div class="cmap-sidebar" id="node-sidebar">
-        <div class="sidebar-header">
-          <h3 id="sidebar-title">Character Details</h3>
-          <span id="sidebar-id" style="font-size:0.7rem; color:var(--text-muted);"></span>
-        </div>
-        <div class="sidebar-content">
-          <input type="hidden" id="node-id">
-          
-          <div class="cmap-form-group">
-            <label>Name</label>
-            <input type="text" id="node-label" class="cmap-input" placeholder="Character Name">
-          </div>
-          
-          <div class="cmap-form-group">
-            <label>Role / Title</label>
-            <input type="text" id="node-title" class="cmap-input" placeholder="e.g. Antagonist, Inspector">
-          </div>
-          
-          <div class="cmap-form-group">
-            <label>Faction / Color</label>
-            <select id="node-group" class="cmap-select">
-              <option value="protagonist">🟦 Protagonist (Blue)</option>
-              <option value="antagonist">🟥 Antagonist (Red)</option>
-              <option value="supporting">🟩 Supporting (Green)</option>
-              <option value="neutral">🟨 Neutral (Amber)</option>
-              <option value="location">🟪 Location/Object (Purple)</option>
-            </select>
-          </div>
-
-          <div class="cmap-form-group">
-            <label>Importance (Size): <span id="node-size-val">30</span></label>
-            <input type="range" id="node-size" min="15" max="60" value="30" class="cmap-input" style="padding:0; height:auto;" oninput="document.getElementById('node-size-val').innerText = this.value;">
-          </div>
-
-          <div class="cmap-form-group">
-            <label>Avatar Image URL (Optional)</label>
-            <input type="url" id="node-image" class="cmap-input" placeholder="https://...">
-          </div>
-
-          <div class="cmap-form-group">
-            <label>Dossier / Notes</label>
-            <textarea id="node-notes" class="cmap-textarea" placeholder="Character motivations, history, analysis..."></textarea>
-          </div>
-
-          <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
-            <button class="pandora-btn" style="background:var(--accent-color); color:#000;" onclick="saveSelectedNode()">💾 Save Character</button>
-            <button class="pandora-btn" style="background:transparent; border-color:#dc2626; color:#ef4444;" onclick="deleteSelectedElement()">🗑️ Delete Selected</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-/* =====================================================
-   1. GLOBAL STATE INITIALIZATION
-   ===================================================== */
-let PandoraState = JSON.parse(localStorage.getItem('PandoraState_v1')) || {
-  activeBookId: null,
-  globalWallpaper: '',
-  books: {}
-};
-
-/* =====================================================
-   2. CORE SYSTEM & NAVIGATION LOGIC
-   ===================================================== */
-function saveGlobalState() {
-  localStorage.setItem('PandoraState_v1', JSON.stringify(PandoraState));
-  updateGlobalUI();
-}
-
-function initApp() {
-  if (PandoraState.globalWallpaper) {
-    document.body.style.backgroundImage = `url(${PandoraState.globalWallpaper})`;
-  }
-  
-  // Auto-initialize fallback book if empty
-  if (Object.keys(PandoraState.books).length === 0) {
-    const defaultId = 'book_' + Date.now();
-    PandoraState.books[defaultId] = {
-      title: "My First Book", geminiUrl: "", coverImg: "",
-      chapterText: "", canvasData: null, nodes: [], edges: [], flashcards: []
-    };
-    PandoraState.activeBookId = defaultId;
-    saveGlobalState();
-  }
-  
-  renderHomeBooks();
-  updateGlobalUI();
-  initFlashcards();
-  initCharacterMapCanvas();
-}
-
-function updateGlobalUI() {
-  const activeBook = PandoraState.books[PandoraState.activeBookId];
-  const label = document.getElementById('global-book-label');
-  const geminiLink = document.getElementById('global-gemini-link');
-  
-  if (label) {
-    label.innerText = activeBook ? `📖 ${activeBook.title}` : "No Book Selected";
-  }
-  if (geminiLink) {
-    if (activeBook && activeBook.geminiUrl) {
-      geminiLink.href = activeBook.geminiUrl;
-      geminiLink.classList.remove('hidden');
-    } else {
-      geminiLink.classList.add('hidden');
-    }
-  }
-}
-
-// Navigation Tab Switching
-document.querySelectorAll('.nav-btn').forEach(btn => {
-  btn.addEventListener('click', (e) => {
-    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
-    e.target.classList.add('active');
-    
-    const targetId = e.target.dataset.target;
-    const targetEl = document.getElementById(targetId);
-    if (targetEl) targetEl.classList.add('active');
-
-    if (targetId === 'map-view') {
-      renderCharacterMap();
-    }
-  });
-});
-
-/* =====================================================
-   3. HOME VIEW & LIBRARY MANAGEMENT
-   ===================================================== */
-function renderHomeBooks() {
-  const select = document.getElementById('home-book-select');
-  if (!select) return;
-  select.innerHTML = '';
-  Object.keys(PandoraState.books).forEach(id => {
-    const option = document.createElement('option');
-    option.value = id;
-    option.innerText = PandoraState.books[id].title;
-    if (id === PandoraState.activeBookId) option.selected = true;
-    select.appendChild(option);
-  });
-}
-
-function switchActiveBook() {
-  const select = document.getElementById('home-book-select');
-  if (!select) return;
-  PandoraState.activeBookId = select.value;
-  saveGlobalState();
-  
-  if (document.getElementById('map-view')?.classList.contains('active')) {
-    renderCharacterMap();
-  }
-  if (document.getElementById('flashcard-view')?.classList.contains('active')) {
-    initFlashcards();
-  }
-}
-
-function createNewBook() {
-  const title = prompt("Enter new book title:");
-  if (!title) return;
-  const id = 'book_' + Date.now();
-  PandoraState.books[id] = {
-    title: title, geminiUrl: "", coverImg: "",
-    chapterText: "", canvasData: null, nodes: [], edges: [], flashcards: []
-  };
-  PandoraState.activeBookId = id;
-  saveGlobalState();
-  renderHomeBooks();
-  initFlashcards();
-}
-
-function deleteActiveBook() {
-  const activeId = PandoraState.activeBookId;
-  if (!activeId) return;
-  if (confirm(`Are you sure you want to delete "${PandoraState.books[activeId].title}"? This cannot be undone.`)) {
-    delete PandoraState.books[activeId];
-    const remainingKeys = Object.keys(PandoraState.books);
-    PandoraState.activeBookId = remainingKeys.length > 0 ? remainingKeys[0] : null;
-    saveGlobalState();
-    renderHomeBooks();
-    initFlashcards();
-  }
-}
-
-function setGlobalWallpaper(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    PandoraState.globalWallpaper = e.target.result;
-    document.body.style.backgroundImage = `url(${e.target.result})`;
-    saveGlobalState();
-  };
-  reader.readAsDataURL(file);
-}
-
-function editActiveBook() {
-  const activeId = PandoraState.activeBookId;
-  if (!activeId) return alert("No active book.");
-  const book = PandoraState.books[activeId];
-  document.getElementById('bm-title').value = book.title;
-  document.getElementById('bm-url').value = book.geminiUrl || "";
-  document.getElementById('book-modal').style.display = 'flex';
-}
-
-function saveBookMetadata() {
-  const activeId = PandoraState.activeBookId;
-  PandoraState.books[activeId].title = document.getElementById('bm-title').value;
-  PandoraState.books[activeId].geminiUrl = document.getElementById('bm-url').value;
-  
-  const file = document.getElementById('bm-cover-file').files[0];
-  if (file) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      PandoraState.books[activeId].coverImg = e.target.result;
-      finishSavingMetadata();
-    };
-    reader.readAsDataURL(file);
-  } else {
-    finishSavingMetadata();
-  }
-}
-
-function finishSavingMetadata() {
-  saveGlobalState();
-  renderHomeBooks();
-  document.getElementById('book-modal').style.display = 'none';
-  initFlashcards();
-}
-
-function openLibraryModal() {
-  document.getElementById('library-modal').style.display = 'flex';
-}
-
-function createSnapshot() {
-  localStorage.setItem(`PandoraState_Backup_${Date.now()}`, JSON.stringify(PandoraState));
-  alert("Local snapshot created successfully.");
-}
-
-function downloadFullBackup() {
-  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(PandoraState));
-  const dlAnchorElem = document.createElement('a');
-  dlAnchorElem.setAttribute("href", dataStr);
-  dlAnchorElem.setAttribute("download", `Pandora_Backup_${new Date().toISOString().split('T')[0]}.json`);
-  dlAnchorElem.click();
-}
-
-function restoreFromBackup(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    try {
-      const restored = JSON.parse(e.target.result);
-      if (restored && restored.books) {
-        PandoraState = restored;
-        saveGlobalState();
-        alert("Backup restored successfully! Reloading...");
-        location.reload();
-      } else {
-        alert("Invalid backup file format.");
-      }
-    } catch (err) {
-      alert("Error parsing backup file.");
-    }
-  };
-  reader.readAsText(file);
-}
-
-/* =====================================================
-   4. EBBINGHAUS FLASHCARD MODULE (SM-2 ALGORITHM)
-   ===================================================== */
-let fcCurrentMode = 'standard';
-let fcActiveCards = [];
-let fcCurrentCardIndex = 0;
-let fcInterleavedBooks = ['ALL'];
-let fcIsAnswerShowing = false;
-let fcGuardEnabled = false;
-let fcDueOnly = false;
-
-function createEmptyCard(bookId) {
-  return {
-    id: 'fc_' + Date.now() + Math.random().toString(36).substr(2, 5),
-    bookId: bookId,
-    prompt: '', answer: '', cloze: '', image: '',
-    box: 0,
-    easeFactor: 2.5,
-    interval: 0,
-    nextDueDate: Date.now(),
-    history: []
-  };
-}
-
-function initFlashcards() {
-  renderBookshelf();
-  populateFlashcardBookSelect();
-  buildCardPool();
-}
-
-function renderBookshelf() {
-  const shelf = document.getElementById('bookshelf');
-  if (!shelf) return;
-  shelf.innerHTML = '';
-  Object.keys(PandoraState.books).forEach(id => {
-    const book = PandoraState.books[id];
-    const tile = document.createElement('div');
-    tile.className = `book-tile ${id === PandoraState.activeBookId && fcInterleavedBooks.includes('ALL') ? 'active' : ''}`;
-    if (fcInterleavedBooks.includes(id) && !fcInterleavedBooks.includes('ALL')) tile.classList.add('interleaved-selected');
-    
-    tile.onclick = () => {
-      const select = document.getElementById('book-select');
-      if (select) select.value = id;
-      filterByBook(id);
-    };
-
-    if (book.coverImg) {
-      const img = document.createElement('img');
-      img.src = book.coverImg;
-      tile.appendChild(img);
-    } else {
-      const fallback = document.createElement('div');
-      fallback.className = 'book-fallback';
-      fallback.innerText = book.title;
-      tile.appendChild(fallback);
-    }
-    shelf.appendChild(tile);
-  });
-}
-
-function populateFlashcardBookSelect() {
-  const select = document.getElementById('book-select');
-  if (!select) return;
-  const currentVal = select.value;
-  select.innerHTML = '<option value="ALL">All Books Combined (Global Interleaved)</option>';
-  Object.keys(PandoraState.books).forEach(id => {
-    const option = document.createElement('option');
-    option.value = id;
-    option.innerText = PandoraState.books[id].title;
-    select.appendChild(option);
-  });
-  if (document.querySelector(`#book-select option[value="${currentVal}"]`)) {
-    select.value = currentVal;
-  }
-}
-
-function filterByBook(val) {
-  fcInterleavedBooks = [val];
-  renderBookshelf();
-  buildCardPool();
-}
-
-function toggleDueFilter() {
-  fcDueOnly = !fcDueOnly;
-  const btn = document.getElementById('btn-due-toggle');
-  if (btn) {
-    btn.style.background = fcDueOnly ? '#dc2626' : 'var(--bg-card)';
-    btn.style.color = fcDueOnly ? '#fff' : 'var(--text-main)';
-  }
-  buildCardPool();
-}
-
-function toggleGuard(checked) { fcGuardEnabled = checked; }
-
-function openInterleaveModal() {
-  const container = document.getElementById('interleave-checkboxes');
-  if (!container) return;
-  container.innerHTML = '';
-  Object.keys(PandoraState.books).forEach(id => {
-    const book = PandoraState.books[id];
-    const label = document.createElement('label');
-    label.style.display = 'flex'; label.style.alignItems = 'center'; label.style.gap = '8px';
-    const cb = document.createElement('input');
-    cb.type = 'checkbox'; cb.value = id;
-    if (fcInterleavedBooks.includes(id) || fcInterleavedBooks.includes('ALL')) cb.checked = true;
-    label.appendChild(cb);
-    label.appendChild(document.createTextNode(book.title));
-    container.appendChild(label);
-  });
-  document.getElementById('interleave-modal').style.display = 'flex';
-}
-
-function applyInterleavedSelection() {
-  const checked = Array.from(document.querySelectorAll('#interleave-checkboxes input:checked')).map(cb => cb.value);
-  if (checked.length === 0) { alert("Select at least one book."); return; }
-  fcInterleavedBooks = checked;
-  const select = document.getElementById('book-select');
-  if (select) select.value = checked.length === Object.keys(PandoraState.books).length ? 'ALL' : checked[0];
-  document.getElementById('interleave-modal').style.display = 'none';
-  renderBookshelf();
-  buildCardPool();
-}
-
-function setMode(mode) {
-  fcCurrentMode = mode;
-  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-  document.getElementById(`tab-${mode}`)?.classList.add('active');
-  
-  document.getElementById('mode-feynman-panel')?.classList.add('hidden');
-  document.getElementById('mode-cloze-panel')?.classList.add('hidden');
-  document.getElementById('mode-standard-panel')?.classList.add('hidden');
-  document.getElementById(`mode-${mode}-panel`)?.classList.remove('hidden');
-  
-  if (fcIsAnswerShowing) {
-    document.getElementById('model-answer')?.classList.remove('hidden');
-    document.getElementById('anki-controls')?.classList.remove('hidden');
-  }
-}
-
-function buildCardPool() {
-  fcActiveCards = [];
-  let allCards = [];
-  
-  const targetBooks = fcInterleavedBooks.includes('ALL') ? Object.keys(PandoraState.books) : fcInterleavedBooks;
-  targetBooks.forEach(bookId => {
-    if (PandoraState.books[bookId] && PandoraState.books[bookId].flashcards) {
-      allCards = allCards.concat(PandoraState.books[bookId].flashcards);
-    }
-  });
-
-  updateLeitnerStats(allCards);
-
-  const now = Date.now();
-  fcActiveCards = fcDueOnly ? allCards.filter(c => c.nextDueDate <= now) : allCards;
-  fcActiveCards.sort(() => Math.random() - 0.5);
-  
-  fcCurrentCardIndex = 0;
-  renderNextCard();
-}
-
-function updateLeitnerStats(cards) {
-  const stats = { due: 0, b1: 0, b2: 0, b3: 0, b4: 0, b5: 0, bm: 0 };
-  const now = Date.now();
-  
-  cards.forEach(c => {
-    if (c.nextDueDate <= now && c.box !== 6) stats.due++;
-    if (c.box === 0 || c.box === 1) stats.b1++;
-    else if (c.box === 2) stats.b2++;
-    else if (c.box === 3) stats.b3++;
-    else if (c.box === 4) stats.b4++;
-    else if (c.box === 5) stats.b5++;
-    else if (c.box >= 6) stats.bm++;
-  });
-
-  ['due', 'b1', 'b2', 'b3', 'b4', 'b5', 'bm'].forEach(key => {
-    const el = document.getElementById(`${key}-count`);
-    if (el) el.innerText = stats[key];
-  });
-}
-
-function renderNextCard() {
-  fcIsAnswerShowing = false;
-  document.getElementById('model-answer')?.classList.add('hidden');
-  document.getElementById('anki-controls')?.classList.add('hidden');
-  document.querySelectorAll('.reveal-btn').forEach(btn => btn.style.display = 'block');
-  
-  const feynmanIn = document.getElementById('feynman-input');
-  if (feynmanIn) feynmanIn.value = '';
-
-  if (fcActiveCards.length === 0 || fcCurrentCardIndex >= fcActiveCards.length) {
-    document.getElementById('card-prompt').innerHTML = "🎉 All caught up! No cards in this view.";
-    document.getElementById('card-book-title').innerText = "SESSION COMPLETE";
-    document.getElementById('card-counter').innerText = "Q0/0";
-    document.getElementById('card-box-label').innerText = "-";
-    document.getElementById('card-due-status').innerText = "";
-    document.querySelectorAll('.reveal-btn').forEach(btn => btn.style.display = 'none');
-    return;
-  }
-
-  const card = fcActiveCards[fcCurrentCardIndex];
-  const book = PandoraState.books[card.bookId];
-  
-  document.getElementById('card-book-title').innerText = book ? book.title.toUpperCase() : "UNKNOWN BOOK";
-  document.getElementById('card-counter').innerText = `Q${fcCurrentCardIndex + 1}/${fcActiveCards.length}`;
-  document.getElementById('card-box-label').innerText = card.box >= 6 ? 'MASTERED' : `BOX ${card.box === 0 ? 1 : card.box}`;
-  
-  const isDue = card.nextDueDate <= Date.now();
-  const dueStatus = document.getElementById('card-due-status');
-  if (dueStatus) {
-    dueStatus.innerText = isDue ? '🔴 Due Now' : '🟢 Not Due';
-    dueStatus.style.color = isDue ? '#ef4444' : '#10b981';
-  }
-
-  if (fcCurrentMode === 'cloze' && card.cloze) {
-    const regex = new RegExp(card.cloze, 'gi');
-    document.getElementById('card-prompt').innerHTML = card.prompt.replace(regex, '___[?]___');
-  } else {
-    document.getElementById('card-prompt').innerText = card.prompt;
-  }
-}
-
-function toggleAnswer() {
-  if (fcGuardEnabled) {
-    document.querySelectorAll('.reveal-btn').forEach(btn => btn.innerText = "Processing (3s Guard)...");
-    setTimeout(revealActualAnswer, 3000);
-  } else {
-    revealActualAnswer();
-  }
-}
-
-function revealActualAnswer() {
-  fcIsAnswerShowing = true;
-  const card = fcActiveCards[fcCurrentCardIndex];
-  const answerBox = document.getElementById('model-answer');
-  
-  if (answerBox) {
-    if (fcCurrentMode === 'cloze' && card.cloze) {
-      answerBox.innerHTML = `<strong>Target:</strong> <span class="cloze-target">${card.cloze}</span><br><br>${card.answer}`;
-    } else {
-      answerBox.innerHTML = card.answer;
-    }
-    answerBox.classList.remove('hidden');
-  }
-  
-  document.querySelectorAll('.reveal-btn').forEach(btn => btn.style.display = 'none');
-  document.getElementById('anki-controls')?.classList.remove('hidden');
-}
-
-function rateCard(ratingStr) {
-  const card = fcActiveCards[fcCurrentCardIndex];
-  let grade = 0;
-
-  if (ratingStr === 'again') grade = 0;
-  if (ratingStr === 'hard') grade = 1;
-  if (ratingStr === 'good') grade = 2;
-  if (ratingStr === 'easy') grade = 3;
-
-  if (grade === 0) {
-    card.box = 1;
-    card.interval = 1;
-    card.easeFactor = Math.max(1.3, card.easeFactor - 0.2);
-  } else if (grade === 1) {
-    card.interval = card.interval === 0 ? 1 : card.interval * 1.2;
-    card.easeFactor = Math.max(1.3, card.easeFactor - 0.15);
-  } else if (grade === 2) {
-    card.box += 1;
-    if (card.interval === 0) card.interval = 1;
-    else if (card.interval === 1) card.interval = 6;
-    else card.interval = Math.round(card.interval * card.easeFactor);
-  } else if (grade === 3) {
-    card.box += 2;
-    card.easeFactor += 0.15;
-    if (card.interval === 0) card.interval = 4;
-    else if (card.interval === 1) card.interval = 10;
-    else card.interval = Math.round(card.interval * card.easeFactor * 1.3);
-  }
-
-  if (card.box > 6) card.box = 6;
-  card.nextDueDate = Date.now() + (card.interval * 24 * 60 * 60 * 1000);
-  card.history.push({ grade: grade, time: Date.now() });
-
-  saveGlobalState();
-  fcCurrentCardIndex++;
-  
-  let allCards = [];
-  const targetBooks = fcInterleavedBooks.includes('ALL') ? Object.keys(PandoraState.books) : fcInterleavedBooks;
-  targetBooks.forEach(bookId => { if (PandoraState.books[bookId]) allCards = allCards.concat(PandoraState.books[bookId].flashcards); });
-  updateLeitnerStats(allCards);
-
-  renderNextCard();
-}
-
-function openCardManager() {
-  renderCardManagerList();
-  document.getElementById('card-manager-modal').style.display = 'flex';
-}
-
-function renderCardManagerList() {
-  const container = document.getElementById('card-manager-list');
-  if (!container) return;
-  container.innerHTML = '';
-  
-  const targetBooks = fcInterleavedBooks.includes('ALL') ? Object.keys(PandoraState.books) : fcInterleavedBooks;
-  
-  targetBooks.forEach(bookId => {
-    const book = PandoraState.books[bookId];
-    if (!book || !book.flashcards) return;
-    
-    book.flashcards.forEach(card => {
-      const div = document.createElement('div');
-      div.style.padding = '10px'; div.style.borderBottom = '1px solid var(--border-color)';
-      div.style.display = 'flex'; div.style.justifyContent = 'space-between'; div.style.alignItems = 'center';
-      
-      const textDiv = document.createElement('div');
-      textDiv.innerHTML = `<strong>${book.title}</strong><br><span style="font-size:0.8rem; color:var(--text-muted);">${card.prompt.substring(0, 50)}...</span>`;
-      
-      const btnGroup = document.createElement('div');
-      btnGroup.style.display = 'flex'; btnGroup.style.gap = '5px';
-      
-      const editBtn = document.createElement('button');
-      editBtn.className = 'fc-btn'; editBtn.innerText = 'Edit';
-      editBtn.onclick = () => openEditCardModal(card, book.title);
-      
-      const delBtn = document.createElement('button');
-      delBtn.className = 'fc-btn'; delBtn.style.color = '#ef4444'; delBtn.innerText = 'Del';
-      delBtn.onclick = () => deleteCard(bookId, card.id);
-      
-      btnGroup.appendChild(editBtn); btnGroup.appendChild(delBtn);
-      div.appendChild(textDiv); div.appendChild(btnGroup);
-      container.appendChild(div);
-    });
-  });
-}
-
-function openAddCardModal() {
-  const bookId = PandoraState.activeBookId;
-  if (!bookId) return alert("Select an active book first.");
-  document.getElementById('edit-modal-title').innerText = "Add New Card";
-  document.getElementById('edit-card-id').value = "";
-  document.getElementById('edit-card-book').value = PandoraState.books[bookId].title;
-  document.getElementById('edit-card-prompt').value = "";
-  document.getElementById('edit-card-answer').value = "";
-  document.getElementById('edit-card-cloze').value = "";
-  document.getElementById('edit-card-modal').style.display = 'flex';
-}
-
-function openEditCardModal(card, bookTitle) {
-  document.getElementById('edit-modal-title').innerText = "Edit Card";
-  document.getElementById('edit-card-id').value = card.id;
-  document.getElementById('edit-card-book').value = bookTitle;
-  document.getElementById('edit-card-prompt').value = card.prompt;
-  document.getElementById('edit-card-answer').value = card.answer;
-  document.getElementById('edit-card-cloze').value = card.cloze || "";
-  document.getElementById('edit-card-modal').style.display = 'flex';
-}
-
-function saveCardEdit() {
-  const cardId = document.getElementById('edit-card-id').value;
-  const promptText = document.getElementById('edit-card-prompt').value;
-  const answerText = document.getElementById('edit-card-answer').value;
-  const clozeText = document.getElementById('edit-card-cloze').value;
-  
-  if (!promptText || !answerText) return alert("Prompt and Answer are required.");
-
-  if (cardId) {
-    Object.keys(PandoraState.books).forEach(bId => {
-      const cards = PandoraState.books[bId].flashcards;
-      const idx = cards.findIndex(c => c.id === cardId);
-      if (idx > -1) {
-        cards[idx].prompt = promptText;
-        cards[idx].answer = answerText;
-        cards[idx].cloze = clozeText;
-      }
-    });
-  } else {
-    const bookId = PandoraState.activeBookId;
-    if (!PandoraState.books[bookId].flashcards) PandoraState.books[bookId].flashcards = [];
-    const newCard = createEmptyCard(bookId);
-    newCard.prompt = promptText;
-    newCard.answer = answerText;
-    newCard.cloze = clozeText;
-    PandoraState.books[bookId].flashcards.push(newCard);
-  }
-
-  saveGlobalState();
-  document.getElementById('edit-card-modal').style.display = 'none';
-  renderCardManagerList();
-  buildCardPool();
-}
-
-function deleteCard(bookId, cardId) {
-  if (confirm("Delete this flashcard?")) {
-    const cards = PandoraState.books[bookId].flashcards;
-    const idx = cards.findIndex(c => c.id === cardId);
-    if (idx > -1) {
-      cards.splice(idx, 1);
-      saveGlobalState();
-      renderCardManagerList();
-      buildCardPool();
-    }
-  }
-}
-
-/* =====================================================
-   5. CHARACTER MAPPING MODULE (CANVAS ENGINE)
-   ===================================================== */
-let mapCanvas = null;
-let mapCtx = null;
-let draggedNode = null;
-let dragOffsetX = 0;
-let dragOffsetY = 0;
-
-function initCharacterMapCanvas(canvasId = 'character-map-canvas') {
-  mapCanvas = document.getElementById(canvasId);
-  if (!mapCanvas) return;
-  mapCtx = mapCanvas.getContext('2d');
-
-  mapCanvas.addEventListener('mousedown', handleMapMouseDown);
-  mapCanvas.addEventListener('mousemove', handleMapMouseMove);
-  mapCanvas.addEventListener('mouseup', handleMapMouseUp);
-}
-
-function renderCharacterMap() {
-  if (!mapCanvas || !mapCtx) {
-    initCharacterMapCanvas();
-    if (!mapCanvas) return;
-  }
-
-  const activeBook = PandoraState.books[PandoraState.activeBookId];
-  if (!activeBook) return;
-
-  if (!activeBook.nodes) activeBook.nodes = [];
-  if (!activeBook.edges) activeBook.edges = [];
-
-  mapCtx.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
-
-  // Draw Relationships (Edges)
-  activeBook.edges.forEach(edge => {
-    const sourceNode = activeBook.nodes.find(n => n.id === edge.from);
-    const targetNode = activeBook.nodes.find(n => n.id === edge.to);
-
-    if (sourceNode && targetNode) {
-      mapCtx.beginPath();
-      mapCtx.moveTo(sourceNode.x, sourceNode.y);
-      mapCtx.lineTo(targetNode.x, targetNode.y);
-      mapCtx.strokeStyle = '#64748b';
-      mapCtx.lineWidth = 2;
-      mapCtx.stroke();
-
-      if (edge.label) {
-        const midX = (sourceNode.x + targetNode.x) / 2;
-        const midY = (sourceNode.y + targetNode.y) / 2;
-        mapCtx.fillStyle = '#f8fafc';
-        mapCtx.fillRect(midX - 20, midY - 10, 40, 20);
-        mapCtx.fillStyle = '#0f172a';
-        mapCtx.font = '10px sans-serif';
-        mapCtx.textAlign = 'center';
-        mapCtx.textBaseline = 'middle';
-        mapCtx.fillText(edge.label, midX, midY);
-      }
-    }
-  });
-
-  // Draw Characters (Nodes)
-  activeBook.nodes.forEach(node => {
-    mapCtx.beginPath();
-    mapCtx.arc(node.x, node.y, 25, 0, 2 * Math.PI);
-    mapCtx.fillStyle = node.color || '#3b82f6';
-    mapCtx.fill();
-    mapCtx.lineWidth = 2;
-    mapCtx.strokeStyle = '#1e293b';
-    mapCtx.stroke();
-
-    mapCtx.fillStyle = '#ffffff';
-    mapCtx.font = '12px sans-serif';
-    mapCtx.textAlign = 'center';
-    mapCtx.textBaseline = 'middle';
-    mapCtx.fillText(node.label.substring(0, 8), node.x, node.y);
-  });
-}
-
-function addCharacterNode(label, x = 100, y = 100, color = '#3b82f6') {
-  const activeBook = PandoraState.books[PandoraState.activeBookId];
-  if (!activeBook) return;
-
-  const newNode = {
-    id: 'node_' + Date.now(),
-    label: label || 'New Character',
-    x: x,
-    y: y,
-    color: color
-  };
-
-  activeBook.nodes.push(newNode);
-  saveGlobalState();
-  renderCharacterMap();
-}
-
-function addCharacterEdge(fromNodeId, toNodeId, label = '') {
-  const activeBook = PandoraState.books[PandoraState.activeBookId];
-  if (!activeBook) return;
-
-  activeBook.edges.push({
-    id: 'edge_' + Date.now(),
-    from: fromNodeId,
-    to: toNodeId,
-    label: label
-  });
-
-  saveGlobalState();
-  renderCharacterMap();
-}
-
-function handleMapMouseDown(e) {
-  const rect = mapCanvas.getBoundingClientRect();
-  const mouseX = e.clientX - rect.left;
-  const mouseY = e.clientY - rect.top;
-
-  const activeBook = PandoraState.books[PandoraState.activeBookId];
-  if (!activeBook || !activeBook.nodes) return;
-
-  draggedNode = activeBook.nodes.find(node => {
-    const dist = Math.hypot(node.x - mouseX, node.y - mouseY);
-    return dist <= 25;
-  });
-
-  if (draggedNode) {
-    dragOffsetX = mouseX - draggedNode.x;
-    dragOffsetY = mouseY - draggedNode.y;
-  }
-}
-
-function handleMapMouseMove(e) {
-  if (!draggedNode) return;
-  const rect = mapCanvas.getBoundingClientRect();
-  draggedNode.x = (e.clientX - rect.left) - dragOffsetX;
-  draggedNode.y = (e.clientY - rect.top) - dragOffsetY;
-  renderCharacterMap();
-}
-
-function handleMapMouseUp() {
-  if (draggedNode) {
-    draggedNode = null;
-    saveGlobalState();
-  }
-}
-
-/* Initialize application loop */
-window.addEventListener('DOMContentLoaded', initApp);
-    <script>
-      let network = null;
-      let nodesDataset = null;
-      let edgesDataset = null;
-      let isEdgeMode = false;
-      let edgeSourceNode = null;
-      
-      const FactionColors = {
-        protagonist: { border: '#2563eb', background: '#1e3a8a', highlight: { border: '#60a5fa', background: '#1e3a8a' } },
-        antagonist: { border: '#dc2626', background: '#7f1d1d', highlight: { border: '#f87171', background: '#7f1d1d' } },
-        supporting: { border: '#16a34a', background: '#14532d', highlight: { border: '#4ade80', background: '#14532d' } },
-        neutral: { border: '#d97706', background: '#78350f', highlight: { border: '#fbbf24', background: '#78350f' } },
-        location: { border: '#7c3aed', background: '#4c1d95', highlight: { border: '#a78bfa', background: '#4c1d95' } },
-        default: { border: '#f59e0b', background: '#1e293b' }
-      };
-
-   function renderCharacterMap() {
-  // Bulletproof auto-fallback if activeBookId is missing
-  if (!PandoraState.activeBookId || !PandoraState.books[PandoraState.activeBookId]) {
-    const bookKeys = Object.keys(PandoraState.books);
-    if (bookKeys.length > 0) {
-      PandoraState.activeBookId = bookKeys[0];
-    }
-  }
-
-  const activeId = PandoraState.activeBookId;
-  const layout = document.getElementById('cmap-active-layout');
-  const placeholder = document.getElementById('cmap-placeholder');
-
-  if (!activeId || !PandoraState.books[activeId]) {
-    layout.style.display = 'none';
-    placeholder.style.display = 'flex';
-    return;
-  }
-
-      function renderCharacterMap() {
-        const activeId = PandoraState.activeBookId;
-        const layout = document.getElementById('cmap-active-layout');
-        const placeholder = document.getElementById('cmap-placeholder');
-
-        if (!activeId) {
-          layout.style.display = 'none';
-          placeholder.style.display = 'flex';
-          return;
-        }
-
-        layout.style.display = 'flex';
-        placeholder.style.display = 'none';
-
-        const book = PandoraState.books[activeId];
-        
-        // Template Injection: If book has no nodes, inject the 10-node default
-        if (!book.nodes || book.nodes.length === 0) {
-          book.nodes = [
-            { id: 'peter', label: 'Peter Andersson', title: 'General Manager of Beartown Ice Hockey', group: 'neutral', value: 40, shape: 'dot', color: FactionColors.neutral },
-            { id: 'kira', label: 'Kira Andersson', title: 'Wife', group: 'protagonist', value: 30, color: FactionColors.protagonist },
-            { id: 'benji', label: 'Benji', title: 'Player', group: 'supporting', value: 30, color: FactionColors.supporting },
-            { id: 'char4', label: 'Character 4', group: 'neutral', value: 25, color: FactionColors.neutral },
-            { id: 'char5', label: 'Character 5', group: 'neutral', value: 25, color: FactionColors.neutral },
-            { id: 'char6', label: 'Character 6', group: 'neutral', value: 25, color: FactionColors.neutral },
-            { id: 'char7', label: 'Character 7', group: 'neutral', value: 25, color: FactionColors.neutral },
-            { id: 'char8', label: 'Character 8', group: 'neutral', value: 25, color: FactionColors.neutral },
-            { id: 'char9', label: 'Character 9', group: 'neutral', value: 25, color: FactionColors.neutral },
-            { id: 'char10', label: 'Character 10', group: 'neutral', value: 25, color: FactionColors.neutral }
-          ];
-          book.edges = [
-            { from: 'peter', to: 'kira', label: 'Spouse' },
-            { from: 'peter', to: 'benji', label: 'Player' },
-            { from: 'peter', to: 'char4' },
-            { from: 'peter', to: 'char5' },
-            { from: 'peter', to: 'char6' },
-            { from: 'peter', to: 'char7' },
-            { from: 'peter', to: 'char8' },
-            { from: 'peter', to: 'char9' },
-            { from: 'peter', to: 'char10' }
-          ];
-        }
-
-        nodesDataset = new vis.DataSet(book.nodes);
-        edgesDataset = new vis.DataSet(book.edges);
-
-        const container = document.getElementById('network-canvas');
-        const data = { nodes: nodesDataset, edges: edgesDataset };
-
-        const options = {
-          nodes: {
-            shape: 'dot', borderWidth: 3, borderWidthSelected: 5,
-            font: { color: '#f8fafc', size: 14, face: '-apple-system', strokeWidth: 3, strokeColor: '#0f172a' },
-            shadow: { enabled: true, color: 'rgba(0,0,0,0.6)', size: 10, x: 5, y: 5 }
-          },
-          edges: {
-            width: 2, selectionWidth: 3, color: { color: '#64748b', highlight: '#f59e0b' },
-            font: { color: '#94a3b8', size: 12, strokeWidth: 2, strokeColor: '#0f172a', align: 'top' },
-            smooth: { type: 'continuous' }, arrows: { to: { enabled: true, scaleFactor: 0.5 } }
-          },
-          physics: {
-            enabled: true, stabilization: false,
-            barnesHut: {
-              gravitationalConstant: parseInt(document.getElementById('phys-gravity').value),
-              centralGravity: 0.15,
-              springLength: parseInt(document.getElementById('phys-springs').value),
-              springConstant: 0.04, damping: 0.09
-            }
-          },
-          interaction: { hover: true, tooltipDelay: 200 }
-        };
-
-        if (network) {
-          network.destroy();
-        }
-        network = new vis.Network(container, data, options);
-
-        // Fix 2: Force dimensional recalculation after the DOM paints the flex layout
-        setTimeout(() => {
-          if (network) {
-            network.redraw();
-            network.fit();
-          }
-        }, 150);
-
-        network.on("selectNode", function (params) {
-          if (isEdgeMode) handleEdgeCreation(params.nodes[0]);
-          else populateSidebarNode(params.nodes[0]);
-        });
-        network.on("selectEdge", function (params) {
-          if (params.nodes.length === 0) populateSidebarEdge(params.edges[0]);
-        });
-        network.on("deselectNode", function () {
-          clearSidebar();
-        });
-      }
-        const activeId = PandoraState.activeBookId;
-        const layout = document.getElementById('cmap-active-layout');
-        const placeholder = document.getElementById('cmap-placeholder');
-
-        if (!activeId) {
-          layout.style.display = 'none';
-          placeholder.style.display = 'flex';
-          return;
-        }
-
-        layout.style.display = 'flex';
-        placeholder.style.display = 'none';
-
-        const book = PandoraState.books[activeId];
-        
-        // Ensure arrays exist
-        if (!book.nodes) book.nodes = [];
-        if (!book.edges) book.edges = [];
-
-        // Initialize vis datasets
-        nodesDataset = new vis.DataSet(book.nodes);
-        edgesDataset = new vis.DataSet(book.edges);
-
-        const container = document.getElementById('network-canvas');
-        const data = { nodes: nodesDataset, edges: edgesDataset };
-
-        const options = {
-          nodes: {
-            shape: 'dot',
-            borderWidth: 3,
-            borderWidthSelected: 5,
-            font: { color: '#f8fafc', size: 14, face: '-apple-system', strokeWidth: 3, strokeColor: '#0f172a' },
-            shadow: { enabled: true, color: 'rgba(0,0,0,0.6)', size: 10, x: 5, y: 5 }
-          },
-          edges: {
-            width: 2,
-            selectionWidth: 3,
-            color: { color: '#64748b', highlight: '#f59e0b' },
-            font: { color: '#94a3b8', size: 12, strokeWidth: 2, strokeColor: '#0f172a', align: 'top' },
-            smooth: { type: 'continuous' },
-            arrows: { to: { enabled: true, scaleFactor: 0.5 } }
-          },
-          physics: {
-            enabled: true,
-            stabilization: false, // Ensures continuous fluid motion
-            barnesHut: {
-              gravitationalConstant: parseInt(document.getElementById('phys-gravity').value),
-              centralGravity: 0.15,
-              springLength: parseInt(document.getElementById('phys-springs').value),
-              springConstant: 0.04,
-              damping: 0.09
-            }
-          },
-          interaction: { hover: true, tooltipDelay: 200 }
-        };
-
-        if (network) {
-          network.destroy();
-        }
-        network = new vis.Network(container, data, options);
-
-        // Event Listeners
-        network.on("selectNode", function (params) {
-          if (isEdgeMode) {
-            handleEdgeCreation(params.nodes[0]);
-          } else {
-            populateSidebarNode(params.nodes[0]);
-          }
-        });
-
-        network.on("selectEdge", function (params) {
-          if (params.nodes.length === 0) populateSidebarEdge(params.edges[0]);
-        });
-
-        network.on("deselectNode", function () {
-          clearSidebar();
-        });
-      }
-
-      function updatePhysics() {
-        if (!network) return;
-        network.setOptions({
-          physics: {
-            barnesHut: {
-              gravitationalConstant: parseInt(document.getElementById('phys-gravity').value),
-              springLength: parseInt(document.getElementById('phys-springs').value)
-            }
-          }
-        });
-      }
-
-      function toggleEdgeMode() {
-        isEdgeMode = !isEdgeMode;
-        const btn = document.getElementById('btn-link-mode');
-        const banner = document.getElementById('edge-banner');
-        if (isEdgeMode) {
-          btn.style.background = '#3b82f6';
-          btn.style.color = '#fff';
-          banner.style.display = 'block';
-          edgeSourceNode = network.getSelectedNodes()[0] || null;
-        } else {
-          btn.style.background = 'var(--bg-card)';
-          btn.style.color = 'var(--text-main)';
-          banner.style.display = 'none';
-          edgeSourceNode = null;
-        }
-      }
-
-      function handleEdgeCreation(targetNodeId) {
-        if (!edgeSourceNode) {
-          edgeSourceNode = targetNodeId;
-          document.getElementById('edge-banner').innerText = "🔗 Source selected. Click target node to link...";
-          return;
-        }
-        
-        if (edgeSourceNode === targetNodeId) {
-          toggleEdgeMode(); // Cancel if clicked same node
-          return;
-        }
-
-        const label = prompt("Enter relationship description (e.g. 'Sibling', 'Enemies'):");
-        if (label !== null) {
-          const newEdge = { id: 'edge_' + Date.now(), from: edgeSourceNode, to: targetNodeId, label: label };
-          edgesDataset.add(newEdge);
-          syncMapStateToPandora();
-        }
-        toggleEdgeMode(); // Auto-exit edge mode
-      }
-
-      // Sidebar CRUD Logistics
-      function clearSidebar() {
-        document.getElementById('sidebar-title').innerText = "Character Details";
-        document.getElementById('sidebar-id').innerText = "";
-        document.getElementById('node-id').value = "";
-        document.getElementById('node-label').value = "";
-        document.getElementById('node-title').value = "";
-        document.getElementById('node-group').value = "neutral";
-        document.getElementById('node-size').value = 30;
-        document.getElementById('node-size-val').innerText = "30";
-        document.getElementById('node-image').value = "";
-        document.getElementById('node-notes').value = "";
-      }
-
-      function populateSidebarNode(nodeId) {
-        const node = nodesDataset.get(nodeId);
-        if (!node) return;
-        
-        document.getElementById('sidebar-title').innerText = "Edit Character";
-        document.getElementById('sidebar-id').innerText = `ID: ${node.id.substring(0,8)}...`;
-        document.getElementById('node-id').value = node.id;
-        document.getElementById('node-label').value = node.label || "";
-        document.getElementById('node-title').value = node.title || "";
-        document.getElementById('node-group').value = node.group || "neutral";
-        document.getElementById('node-size').value = node.value || 30;
-        document.getElementById('node-size-val').innerText = node.value || 30;
-        document.getElementById('node-image').value = (node.shape === 'circularImage') ? node.image : "";
-        document.getElementById('node-notes').value = node.notes || "";
-      }
-
-      function populateSidebarEdge(edgeId) {
-        clearSidebar();
-        const edge = edgesDataset.get(edgeId);
-        if (!edge) return;
-        document.getElementById('sidebar-title').innerText = "Edit Relationship";
-        document.getElementById('sidebar-id').innerText = `Edge: ${edgeId.substring(0,8)}...`;
-        document.getElementById('node-id').value = edge.id;
-        document.getElementById('node-label').value = edge.label || "";
-      }
-
-      function addNewCharacter() {
-        const newId = 'node_' + Date.now();
-        const newNode = {
-          id: newId,
-          label: "New Character",
-          group: "neutral",
-          value: 30,
-          color: FactionColors.neutral
-        };
-        nodesDataset.add(newNode);
-        syncMapStateToPandora();
-        network.selectNodes([newId]);
-        populateSidebarNode(newId);
-      }
-
-      function saveSelectedNode() {
-        const id = document.getElementById('node-id').value;
-        if (!id) return;
-
-        const label = document.getElementById('node-label').value;
-        
-        // Handle Edge Edit vs Node Edit
-        if (id.startsWith('edge_')) {
-          edgesDataset.update({ id: id, label: label });
-        } else {
-          const group = document.getElementById('node-group').value;
-          const title = document.getElementById('node-title').value;
-          const val = parseInt(document.getElementById('node-size').value);
-          const img = document.getElementById('node-image').value;
-          const notes = document.getElementById('node-notes').value;
-
-          const updatedNode = {
-            id: id,
-            label: label,
-            title: title,
-            group: group,
-            value: val,
-            notes: notes,
-            color: FactionColors[group] || FactionColors.default
-          };
-
-          if (img) {
-            updatedNode.shape = 'circularImage';
-            updatedNode.image = img;
-          } else {
-            updatedNode.shape = 'dot';
-          }
-
-          nodesDataset.update(updatedNode);
-        }
-        
-        syncMapStateToPandora();
-      }
-
-      function deleteSelectedElement() {
-        const selectedNodes = network.getSelectedNodes();
-        const selectedEdges = network.getSelectedEdges();
-        
-        if (selectedNodes.length === 0 && selectedEdges.length === 0) return;
-        
-        if (confirm("Delete selected item(s)?")) {
-          if (selectedNodes.length > 0) nodesDataset.remove(selectedNodes);
-          if (selectedEdges.length > 0) edgesDataset.remove(selectedEdges);
-          clearSidebar();
-          syncMapStateToPandora();
-        }
-      }
-
-      function syncMapStateToPandora() {
-        const activeId = PandoraState.activeBookId;
-        if (activeId && nodesDataset && edgesDataset) {
-          PandoraState.books[activeId].nodes = nodesDataset.get();
-          PandoraState.books[activeId].edges = edgesDataset.get();
-          saveGlobalState(); // Master function from Base Shell
-        }
-      }
-    </script>
-  </main>
-
-  <!-- =====================================================
-       FLASHCARD VIEW (EBBINGHAUS INTEGRATION)
+<!-- =====================================================
+       MODULE 4: FLASHCARD SYSTEM
        ===================================================== -->
   <main id="flashcard-view" class="view-section">
     <div class="fc-wrapper">
       <div class="fc-header">
-        <h1 id="app-title">Ebbinghaus Literature Studio</h1>
-        <p>Multi-Book Reader • SM-2 Date Engine & Neuroscience Interleaving</p>
-        <div id="retention-metric" class="metric-badge">Session Retention: N/A (Target: ~85%)</div>
+        <h1>Pandora's Flashcards</h1>
+        <p>Ebbinghaus Spaced Repetition & Leitner System</p>
+        <div id="card-due-status" class="metric-badge">0 Cards Due Today</div>
       </div>
 
-      <!-- Bookshelf -->
+      <!-- Bookshelf Deck Selection -->
       <div class="bookshelf-wrapper">
         <div class="bookshelf-title">
-          <span>Bookshelf Collection</span>
-          <button class="fc-btn" style="padding: 4px 8px; font-size: 0.75rem;" onclick="openInterleaveModal()">Custom Multi-Book Selection</button>
+          <span>📚 Library Bookshelf</span>
+          <button class="fc-btn" onclick="openCardManager()">⚙️ Manage Cards</button>
         </div>
-        <div class="bookshelf-grid" id="bookshelf"></div>
+        <div id="bookshelf" class="bookshelf-grid"></div>
       </div>
 
-      <!-- Leitner Boxes Bar (Now with DUE Counter) -->
+      <!-- Leitner Box Counters -->
       <div class="leitner-bar">
-        <div class="box-card" style="border-color:var(--accent-color);"><div class="box-label">DUE</div><div class="box-count" id="due-count">0</div></div>
-        <div class="box-card"><div class="box-label">BOX 1</div><div class="box-count" id="b1-count">0</div></div>
-        <div class="box-card"><div class="box-label">BOX 2</div><div class="box-count" id="b2-count">0</div></div>
-        <div class="box-card"><div class="box-label">BOX 3</div><div class="box-count" id="b3-count">0</div></div>
-        <div class="box-card"><div class="box-label">BOX 4</div><div class="box-count" id="b4-count">0</div></div>
-        <div class="box-card"><div class="box-label">BOX 5</div><div class="box-count" id="b5-count">0</div></div>
-        <div class="box-card"><div class="box-label">MASTERED</div><div class="box-count" id="bm-count">0</div></div>
+        <div class="box-card"><div class="box-label">BOX 1</div><div id="box-1-count" class="box-count">0</div></div>
+        <div class="box-card"><div class="box-label">BOX 2</div><div id="box-2-count" class="box-count">0</div></div>
+        <div class="box-card"><div class="box-label">BOX 3</div><div id="box-3-count" class="box-count">0</div></div>
+        <div class="box-card"><div class="box-label">BOX 4</div><div id="box-4-count" class="box-count">0</div></div>
+        <div class="box-card"><div class="box-label">BOX 5</div><div id="box-5-count" class="box-count">0</div></div>
+        <div class="box-card"><div class="box-label">MASTERED</div><div id="box-6-count" class="box-count">0</div></div>
+        <div class="box-card"><div class="box-label">DUE NOW</div><div id="box-due-count" class="box-count" style="color:#ef4444;">0</div></div>
       </div>
 
-      <!-- Controls Bar -->
+      <!-- Controls & Deck Select -->
       <div class="controls-bar">
         <div class="controls-group">
-          <select id="book-select" onchange="filterByBook(this.value)">
-            <option value="ALL">All Books Combined (Global Interleaved)</option>
-          </select>
-          <button class="fc-btn" id="btn-due-toggle" onclick="toggleDueFilter()" title="Filter cards where nextDueDate <= Now">📅 Due Cards Only</button>
-          <label class="toggle-label" title="Enforces active memory retrieval by pausing before showing answers">
-            <input type="checkbox" id="guard-toggle" onchange="toggleGuard(this.checked)"> <span>⏱️ 3s Delay Guard</span>
-          </label>
+          <select id="book-select" onchange="switchDeck(this.value)"></select>
+          <button id="btn-due-toggle" class="fc-btn" onclick="toggleDueOnly()">Show All Cards</button>
         </div>
         <div class="controls-group">
-          <button class="btn-action" onclick="openCardManager()">Manage Cards</button>
+          <button class="btn-action" onclick="openCreateCardModal()">+ Add New Card</button>
         </div>
       </div>
 
-      <!-- 3 Study Technique Tabs -->
-      <div class="technique-tabs">
-        <button class="tab-btn active" id="tab-feynman" onclick="setMode('feynman')">Feynman Technique</button>
-        <button class="tab-btn" id="tab-cloze" onclick="setMode('cloze')">Cloze Technique</button>
-        <button class="tab-btn" id="tab-standard" onclick="setMode('standard')">Standard Q&A</button>
-      </div>
-
-      <!-- Flashcard Card Display -->
-      <div class="card-container" id="fc-main-card">
-        <div>
-          <div class="card-meta">
-            <span id="card-book-title">NO CARDS LOADED</span>
-            <span id="card-due-status" style="color: var(--accent-color);">Due: Now</span>
-            <span id="card-counter">Q0/0</span>
-            <span id="card-box-label">-</span>
-          </div>
-
-          <div class="card-prompt" id="card-prompt">Please select a book and add cards to begin.</div>
-
-          <div id="prompt-image-box" class="prompt-image-container hidden">
-            <img id="prompt-img" class="prompt-image" src="" alt="Question Diagram or Visual Prompt">
-          </div>
-
-          <!-- Mode 1: Feynman -->
-          <div id="mode-feynman-panel">
-            <textarea id="feynman-input" class="fc-textarea" placeholder="Explain this concept in simple terms as if teaching someone else..."></textarea>
-            <button class="fc-btn reveal-btn" onclick="toggleAnswer()" style="width:100%;">Compare with Model Answer</button>
-          </div>
-
-          <!-- Mode 2: Cloze -->
-          <div id="mode-cloze-panel" class="hidden">
-            <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:10px;">Recall the missing target phrase, then reveal:</p>
-            <button class="fc-btn reveal-btn" onclick="toggleAnswer()" style="width:100%;">Reveal Blank Target</button>
-          </div>
-
-          <!-- Mode 3: Standard -->
-          <div id="mode-standard-panel" class="hidden">
-            <button class="fc-btn reveal-btn" onclick="toggleAnswer()" style="width:100%;">Show Model Answer</button>
-          </div>
-
-          <!-- Model Answer -->
-          <div id="model-answer" class="model-answer-box hidden"></div>
+      <!-- Active Card Container -->
+      <div class="card-container">
+        <div class="card-meta">
+          <span id="card-book-title">Select a Book</span>
+          <span id="card-counter">Card 0 of 0</span>
+          <span id="card-box-label" class="metric-badge">Box 1</span>
         </div>
 
-        <!-- 4-Button Anki Rating Bar -->
-        <div id="anki-controls" class="hidden">
-          <div style="font-size: 0.7rem; text-align: center; color: var(--text-muted); margin-bottom: 6px; font-weight: bold; letter-spacing: 0.5px;">RATE YOUR RECALL (ANKI SM-2)</div>
-          <div class="anki-rating-bar">
-            <button class="btn-again" onclick="rateCard('again')">Again<br><small>(Reset Box 1)</small></button>
-            <button class="btn-hard" onclick="rateCard('hard')">Hard<br><small>(Stay in Box)</small></button>
-            <button class="btn-good" onclick="rateCard('good')">Good<br><small>(+1 Box)</small></button>
-            <button class="btn-easy" onclick="rateCard('easy')">Easy<br><small>(+2 Boxes)</small></button>
-          </div>
+        <div id="card-prompt" class="card-prompt">Please select or create a book to begin studying.</div>
+
+        <div id="answer-section" class="hidden">
+          <div id="model-answer" class="model-answer-box"></div>
         </div>
+
+        <div id="anki-controls" class="anki-rating-bar hidden">
+          <button class="btn-again" onclick="rateCard(1)">Again (1d)</button>
+          <button class="btn-hard" onclick="rateCard(2)">Hard (3d)</button>
+          <button class="btn-good" onclick="rateCard(3)">Good (7d)</button>
+          <button class="btn-easy" onclick="rateCard(4)">Easy (14d)</button>
+        </div>
+
+        <button id="btn-show-answer" class="btn-action" style="width: 100%; margin-top: 20px;" onclick="revealAnswer()">Reveal Answer</button>
       </div>
     </div>
   </main>
 
   <!-- =====================================================
-       MODALS & OVERLAYS
+       GLOBAL MODAL DIALOGS
        ===================================================== -->
-  
-  <!-- Book Edit/Create Modal (Pandora) -->
-  <div class="lib-modal" id="book-modal">
+  <!-- Create / Edit Book Modal -->
+  <div id="book-modal" class="lib-modal">
     <div class="lib-modal-content">
-      <h3 style="color:var(--accent-color); margin-bottom:15px;" id="book-modal-title">Book Metadata</h3>
+      <h3 id="bm-header" style="color:var(--accent-color); margin-bottom:15px;">Create New Book</h3>
       <div class="home-form-group">
         <label>Book Title</label>
-        <input type="text" id="bm-title">
+        <input type="text" id="bm-title" placeholder="e.g. Les Misérables">
       </div>
       <div class="home-form-group">
-        <label>Gemini Notebook URL</label>
-        <input type="url" id="bm-url" placeholder="https://gemini.google.com/notebook/...">
+        <label>Gemini Notebook URL (Optional)</label>
+        <input type="url" id="bm-url" placeholder="https://gemini.google.com/...">
       </div>
       <div class="home-form-group">
-        <label>Cover Image (Upload)</label>
-        <input type="file" accept="image/*" id="bm-cover-file">
+        <label>Cover Image</label>
+        <input type="file" id="bm-cover-file" accept="image/*">
       </div>
-      <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
-        <button class="pandora-btn" onclick="document.getElementById('book-modal').style.display='none'">Cancel</button>
-        <button class="pandora-btn" style="background:var(--accent-color); color:#000;" onclick="saveBookMetadata()">Save</button>
+      <div style="display:flex; gap:10px; margin-top:20px;">
+        <button class="pandora-btn" style="flex:1; background:var(--accent-color); color:#000;" onclick="saveBookModal()">Save Book</button>
+        <button class="pandora-btn" style="flex:1;" onclick="closeBookModal()">Cancel</button>
       </div>
     </div>
   </div>
 
-  <!-- Library Center / Recovery Modal (Pandora) -->
-  <div class="lib-modal" id="library-modal">
+  <!-- Library Backup Modal -->
+  <div id="library-modal" class="lib-modal">
     <div class="lib-modal-content">
-      <h3 style="color:var(--accent-color); margin-bottom:15px;">📚 Library Recovery Center</h3>
-      <button class="pandora-btn" style="width:100%; margin-bottom:10px; background:var(--accent-color); color:#000;" onclick="createSnapshot()">📸 Create Recovery Snapshot</button>
-      <button class="pandora-btn" style="width:100%; margin-bottom:10px;" onclick="downloadFullBackup()">💾 Download JSON Backup File</button>
-      <hr style="border-color:var(--border-color); margin: 15px 0;">
-      <label style="font-size:0.85rem; color:var(--text-muted);">Restore from JSON Backup File</label>
-      <input type="file" accept=".json" style="width:100%; margin: 10px 0;" onchange="restoreFromBackup(event)">
-      <div style="text-align:right; margin-top:15px;">
-        <button class="pandora-btn" onclick="document.getElementById('library-modal').style.display='none'">Close</button>
+      <h3 style="color:var(--accent-color); margin-bottom:15px;">Library Backup & Restore</h3>
+      <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:15px;">Export your complete application data to JSON or restore from a previous backup file.</p>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <button class="pandora-btn" style="background:var(--accent-color); color:#000;" onclick="exportLibraryData()">📥 Export Backup (JSON)</button>
+        <input type="file" id="import-file" accept=".json" style="display:none;" onchange="importLibraryData(event)">
+        <button class="pandora-btn" onclick="document.getElementById('import-file').click()">📤 Import Backup (JSON)</button>
+        <button class="pandora-btn" style="margin-top:10px;" onclick="closeLibraryModal()">Close</button>
       </div>
     </div>
   </div>
 
-  <!-- Card Manager Modal (Ebbinghaus) -->
+  <!-- Card Manager Modal -->
   <div id="card-manager-modal" class="fc-modal">
     <div class="fc-modal-content">
-      <h3 style="margin-bottom: 10px; color: var(--accent-color);">Manage Cards</h3>
-      <div id="card-manager-list" style="max-height: 350px; overflow-y: auto; margin-bottom: 15px; border: 1px solid var(--border-color); border-radius: 6px;"></div>
-      <div style="display: flex; gap: 10px; justify-content: space-between;">
-        <button class="btn-action" onclick="openAddCardModal()">+ Add New Card</button>
-        <button class="fc-btn" onclick="document.getElementById('card-manager-modal').style.display='none'">Close Manager</button>
-      </div>
+      <h3 style="color:var(--accent-color); margin-bottom:15px;">Card Manager</h3>
+      <div id="card-manager-list" style="display:flex; flex-direction:column; gap:10px; max-height:400px; overflow-y:auto; margin-bottom:15px;"></div>
+      <button class="pandora-btn" style="width:100%;" onclick="closeCardManager()">Close</button>
     </div>
   </div>
 
-  <!-- Edit Card Modal (Ebbinghaus) -->
+  <!-- Edit Card Modal -->
   <div id="edit-card-modal" class="fc-modal">
     <div class="fc-modal-content">
-      <h3 style="margin-bottom: 10px; color: var(--accent-color);" id="edit-modal-title">Edit Card</h3>
+      <h3 style="color:var(--accent-color); margin-bottom:15px;">Edit Flashcard</h3>
       <input type="hidden" id="edit-card-id">
-      
-      <div style="margin-bottom: 10px;">
-        <label style="font-size: 0.8rem; color: var(--text-muted);">Book Title (Read Only - Bound to Folder)</label>
-        <input type="text" id="edit-card-book" class="fc-input" readonly>
+      <div class="home-form-group">
+        <label>Prompt / Question</label>
+        <textarea id="edit-card-prompt" class="fc-textarea"></textarea>
       </div>
-      <div style="margin-bottom: 10px;">
-        <label style="font-size: 0.8rem; color: var(--text-muted);">Question / Prompt</label>
-        <textarea id="edit-card-prompt" class="fc-textarea" style="height: 70px;"></textarea>
+      <div class="home-form-group">
+        <label>Model Answer</label>
+        <textarea id="edit-card-answer" class="fc-textarea"></textarea>
       </div>
-      <div style="margin-bottom: 10px;">
-        <label style="font-size: 0.8rem; color: var(--text-muted);">Answer / Model Answer</label>
-        <textarea id="edit-card-answer" class="fc-textarea" style="height: 70px;"></textarea>
+      <div class="home-form-group">
+        <label>Cloze Target (Optional)</label>
+        <input type="text" id="edit-card-cloze" class="fc-input" placeholder="Text to hide in cloze mode">
       </div>
-      <div style="margin-bottom: 15px;">
-        <label style="font-size: 0.8rem; color: var(--text-muted);">Cloze Target (Optional)</label>
-        <input type="text" id="edit-card-cloze" class="fc-input" placeholder="Target keyword for cloze mode">
-      </div>
-      <div style="display: flex; gap: 10px; justify-content: flex-end;">
-        <button class="fc-btn" onclick="document.getElementById('edit-card-modal').style.display='none'">Cancel</button>
-        <button class="btn-action" onclick="saveCardEdit()">Save Card</button>
+      <div style="display:flex; gap:10px;">
+        <button class="pandora-btn" style="flex:1; background:var(--accent-color); color:#000;" onclick="saveCardEdit()">Save Changes</button>
+        <button class="pandora-btn" style="flex:1;" onclick="closeCardEditModal()">Cancel</button>
       </div>
     </div>
   </div>
 
-  <!-- Multi-Book Interleave Modal -->
-  <div id="interleave-modal" class="fc-modal">
-    <div class="fc-modal-content">
-      <h3 style="margin-bottom: 10px; color: var(--accent-color);">Multi-Book Interleaving</h3>
-      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px;">Select books to weave into a randomized session:</p>
-      <div id="interleave-checkboxes" style="display:flex; flex-direction:column; gap:8px; margin-bottom:15px; padding:10px; border:1px solid var(--border-color); border-radius:6px;"></div>
-      <div style="display: flex; gap: 10px; justify-content: flex-end;">
-        <button class="fc-btn" onclick="document.getElementById('interleave-modal').style.display='none'">Cancel</button>
-        <button class="btn-action" onclick="applyInterleavedSelection()">Start Session</button>
-      </div>
-    </div>
-  </div>
-
+  <!-- =====================================================
+       CONSOLIDATED JAVASCRIPT ENGINE
+       ===================================================== -->
   <script>
-    /* =====================================================
-       1. INLINE SERVICE WORKER (PWA OFFLINE CACHING)
-       ===================================================== */
-    const swCode = `
-      const CACHE = 'pandora-v1';
-      self.addEventListener('install', e => {
-          e.waitUntil(caches.open(CACHE).then(c => c.addAll(['/'])));
-          self.skipWaiting();
-      });
-      self.addEventListener('fetch', e => {
-          if (e.request.url.startsWith('freeform://')) return;
-          e.respondWith(
-              caches.match(e.request).then(res => res || fetch(e.request).then(fetchRes => {
-                  return caches.open(CACHE).then(c => {
-                      if (e.request.url.startsWith('http')) c.put(e.request, fetchRes.clone());
-                      return fetchRes;
-                  });
-              }))
-          );
-      });
-    `;
-    const blob = new Blob([swCode], { type: 'application/javascript' });
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(err => console.log("SW Error:", err));
-    }
-
-    /* =====================================================
-       2. PANDORA GLOBAL STATE & BOOK ARCHITECTURE
-       ===================================================== */
+    // Master State Structure
     let PandoraState = {
-      wallpaper: null,
       activeBookId: null,
-      books: {} // Format: { id: { title, notebookUrl, coverImage, flashcards: [], nodes: [], edges: [], chapterText: "" } }
+      wallpaper: null,
+      books: {}
     };
-    
-    // Ebbinghaus Shared Variables
-    let allCardsView = []; // Flattened array for Ebbinghaus engine mapping
-    let filteredCards = [];
-    let selectedBooks = []; 
-    let currentIndex = 0;
-    let currentMode = 'feynman';
-    let currentBookFilter = 'ALL';
-    let dueOnlyFilter = false;
-    let delayGuardActive = false;
-    let countdownTimer = null;
 
-    // Distinct Pastel Palettes per Book
-    const PASTEL_PALETTES = [
-      { bg: '#fdf2f8', border: '#f472b6', accent: '#db2777', text: '#831843' },
-      { bg: '#f0fdf4', border: '#4ade80', accent: '#16a34a', text: '#14532d' },
-      { bg: '#eff6ff', border: '#60a5fa', accent: '#2563eb', text: '#1e3a8a' },
-      { bg: '#fef3c7', border: '#fbbf24', accent: '#d97706', text: '#78350f' },
-      { bg: '#f5f3ff', border: '#a78bfa', accent: '#7c3aed', text: '#4c1d95' },
-      { bg: '#fff7ed', border: '#fb923c', accent: '#ea580c', text: '#7c2d12' }
-    ];
-
-    window.onload = function() {
-      // Load Pandora State (which supersedes old gemini_flashcards_v3)
-      const saved = localStorage.getItem('pandora_master_state');
-      if (saved) {
-        PandoraState = JSON.parse(saved);
-      }
-      
-      initNavigation();
-      refreshAppGlobalState();
-      
-      if (PandoraState.wallpaper) {
-        document.getElementById('home-view').style.backgroundImage = `url(${PandoraState.wallpaper})`;
-      }
-    };
+    // Initialize Application
+    document.addEventListener("DOMContentLoaded", () => {
+      loadGlobalState();
+      setupNavigation();
+      renderBookshelf();
+      updateUI();
+    });
 
     function saveGlobalState() {
-      localStorage.setItem('pandora_master_state', JSON.stringify(PandoraState));
-      syncAllCardsView(); // Ensure flashcard engine arrays are updated
+      localStorage.setItem("PandoraState", JSON.stringify(PandoraState));
     }
 
-    function initNavigation() {
-      document.querySelectorAll('.nav-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-          document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
-          e.target.classList.add('active');
-          document.getElementById(e.target.dataset.target).classList.add('active');
-          if (e.target.dataset.target === 'flashcard-view') applyFilter(); // Refresh cards on view
+    function loadGlobalState() {
+      const saved = localStorage.getItem("PandoraState");
+      if (saved) {
+        try { PandoraState = JSON.parse(saved); } catch (e) { console.error("Error loading state", e); }
+      }
+    }
+
+    function setupNavigation() {
+      document.querySelectorAll("nav .nav-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const target = btn.getAttribute("data-target");
+          document.querySelectorAll("nav .nav-btn").forEach(b => b.classList.remove("active"));
+          document.querySelectorAll(".view-section").forEach(v => v.classList.remove("active"));
+          btn.classList.add("active");
+          document.getElementById(target).classList.add("active");
         });
       });
     }
 
-    function refreshAppGlobalState() {
-      // 1. Update Home Select
-      const hSelect = document.getElementById('home-book-select');
-      hSelect.innerHTML = '<option value="">-- Select Active Book --</option>';
-      Object.values(PandoraState.books).forEach(b => {
-        const opt = document.createElement('option');
-        opt.value = b.id; opt.textContent = b.title;
-        if (b.id === PandoraState.activeBookId) opt.selected = true;
-        hSelect.appendChild(opt);
+    function updateUI() {
+      const selectHome = document.getElementById("home-book-select");
+      const selectFc = document.getElementById("book-select");
+      const label = document.getElementById("global-book-label");
+      const link = document.getElementById("global-gemini-link");
+
+      selectHome.innerHTML = '<option value="">-- Select Book --</option>';
+      selectFc.innerHTML = '<option value="">-- Select Book --</option>';
+
+      Object.keys(PandoraState.books).forEach(id => {
+        const book = PandoraState.books[id];
+        const opt1 = new Option(book.title, id);
+        const opt2 = new Option(book.title, id);
+        selectHome.add(opt1);
+        selectFc.add(opt2);
       });
 
-      // 2. Update Global Nav Links & Labels
-      const activeBook = PandoraState.books[PandoraState.activeBookId];
-      if (activeBook) {
-        document.getElementById('global-book-label').textContent = activeBook.title;
-        const glink = document.getElementById('global-gemini-link');
-        if (activeBook.notebookUrl) {
-          glink.href = activeBook.notebookUrl;
-          glink.classList.remove('hidden');
+      if (PandoraState.activeBookId && PandoraState.books[PandoraState.activeBookId]) {
+        const current = PandoraState.books[PandoraState.activeBookId];
+        selectHome.value = PandoraState.activeBookId;
+        selectFc.value = PandoraState.activeBookId;
+        label.innerText = current.title;
+
+        if (current.geminiUrl) {
+          link.href = current.geminiUrl;
+          link.classList.remove("hidden");
         } else {
-          glink.classList.add('hidden');
+          link.classList.add("hidden");
         }
       } else {
-        document.getElementById('global-book-label').textContent = "No Book Selected";
-        document.getElementById('global-gemini-link').classList.add('hidden');
+        label.innerText = "No Book Selected";
+        link.classList.add("hidden");
       }
 
-      syncAllCardsView();
-      updateBookshelf();
-      populateBookSelect();
-      applyFilter();
-    }
-
-    /* =====================================================
-       3. PANDORA BOOK CRUD LOGIC
-       ===================================================== */
-    let editingBookId = null;
-
-    function createNewBook() {
-      editingBookId = 'book_' + Date.now();
-      document.getElementById('book-modal-title').textContent = "Create New Book";
-      document.getElementById('bm-title').value = "";
-      document.getElementById('bm-url').value = "";
-      document.getElementById('bm-cover-file').value = "";
-      document.getElementById('book-modal').style.display = 'flex';
-    }
-
-    function editActiveBook() {
-      if (!PandoraState.activeBookId) return alert("Select a book first.");
-      editingBookId = PandoraState.activeBookId;
-      const b = PandoraState.books[editingBookId];
-      document.getElementById('book-modal-title').textContent = "Edit Book Metadata";
-      document.getElementById('bm-title').value = b.title;
-      document.getElementById('bm-url').value = b.notebookUrl || "";
-      document.getElementById('book-modal').style.display = 'flex';
-    }
-
-    function saveBookMetadata() {
-      const title = document.getElementById('bm-title').value.trim();
-      if (!title) return alert("Title required.");
-      const url = document.getElementById('bm-url').value;
-      const fileInput = document.getElementById('bm-cover-file');
-      
-      const saveToState = (coverData) => {
-        if (!PandoraState.books[editingBookId]) {
-          // New Book
-          PandoraState.books[editingBookId] = { id: editingBookId, title, notebookUrl: url, coverImage: coverData, flashcards: [], nodes: [], edges: [], chapterText: "" };
-        } else {
-          // Edit Book
-          PandoraState.books[editingBookId].title = title;
-          PandoraState.books[editingBookId].notebookUrl = url;
-          if (coverData) PandoraState.books[editingBookId].coverImage = coverData;
-        }
-        PandoraState.activeBookId = editingBookId;
-        saveGlobalState();
-        refreshAppGlobalState();
-        document.getElementById('book-modal').style.display = 'none';
-      };
-
-      if (fileInput.files && fileInput.files[0]) {
-        const reader = new FileReader();
-        reader.onload = e => saveToState(e.target.result);
-        reader.readAsDataURL(fileInput.files[0]);
-      } else {
-        saveToState(PandoraState.books[editingBookId] ? PandoraState.books[editingBookId].coverImage : null);
-      }
-    }
-
-    function deleteActiveBook() {
-      if (!PandoraState.activeBookId) return;
-      if (confirm(`Permanently delete "${PandoraState.books[PandoraState.activeBookId].title}" and all its data?`)) {
-        delete PandoraState.books[PandoraState.activeBookId];
-        PandoraState.activeBookId = null;
-        saveGlobalState();
-        refreshAppGlobalState();
+      if (PandoraState.wallpaper) {
+        document.getElementById("home-view").style.backgroundImage = `url('${PandoraState.wallpaper}')`;
       }
     }
 
     function switchActiveBook() {
-      const id = document.getElementById('home-book-select').value;
-      if (id) {
-        PandoraState.activeBookId = id;
+      const val = document.getElementById("home-book-select").value;
+      PandoraState.activeBookId = val || null;
+      saveGlobalState();
+      updateUI();
+      renderBookshelf();
+    }
+
+    function switchDeck(id) {
+      PandoraState.activeBookId = id || null;
+      saveGlobalState();
+      updateUI();
+      renderBookshelf();
+    }
+
+    function createNewBook() {
+      document.getElementById("bm-header").innerText = "Create New Book";
+      document.getElementById("bm-title").value = "";
+      document.getElementById("bm-url").value = "";
+      document.getElementById("book-modal").style.display = "flex";
+    }
+
+    function editActiveBook() {
+      if (!PandoraState.activeBookId) return alert("Select a book to edit.");
+      const book = PandoraState.books[PandoraState.activeBookId];
+      document.getElementById("bm-header").innerText = "Edit Book Metadata";
+      document.getElementById("bm-title").value = book.title;
+      document.getElementById("bm-url").value = book.geminiUrl || "";
+      document.getElementById("book-modal").style.display = "flex";
+    }
+
+    function saveBookModal() {
+      const title = document.getElementById("bm-title").value.trim();
+      const url = document.getElementById("bm-url").value.trim();
+      if (!title) return alert("Please enter a book title.");
+
+      let id = PandoraState.activeBookId;
+      if (!id || document.getElementById("bm-header").innerText.includes("Create")) {
+        id = "book_" + Date.now();
+      }
+
+      if (!PandoraState.books[id]) {
+        PandoraState.books[id] = { id, title, geminiUrl: url, cards: [], nodes: [], edges: [] };
+      } else {
+        PandoraState.books[id].title = title;
+        PandoraState.books[id].geminiUrl = url;
+      }
+
+      const fileInput = document.getElementById("bm-cover-file");
+      if (fileInput.files && fileInput.files[0]) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          PandoraState.books[id].cover = e.target.result;
+          finishBookSave(id);
+        };
+        reader.readAsDataURL(fileInput.files[0]);
+      } else {
+        finishBookSave(id);
+      }
+    }
+
+    function finishBookSave(id) {
+      PandoraState.activeBookId = id;
+      saveGlobalState();
+      closeBookModal();
+      updateUI();
+      renderBookshelf();
+    }
+
+    function closeBookModal() {
+      document.getElementById("book-modal").style.display = "none";
+    }
+
+    function deleteActiveBook() {
+      if (!PandoraState.activeBookId) return;
+      if (confirm("Delete this book and all its associated data?")) {
+        delete PandoraState.books[PandoraState.activeBookId];
+        PandoraState.activeBookId = null;
         saveGlobalState();
-        refreshAppGlobalState();
+        updateUI();
+        renderBookshelf();
       }
     }
 
     function setGlobalWallpaper(e) {
-      if (e.target.files[0]) {
-        const r = new FileReader();
-        r.onload = event => {
-          PandoraState.wallpaper = event.target.result;
-          document.getElementById('home-view').style.backgroundImage = `url(${PandoraState.wallpaper})`;
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          PandoraState.wallpaper = evt.target.result;
           saveGlobalState();
+          updateUI();
         };
-        r.readAsDataURL(e.target.files[0]);
+        reader.readAsDataURL(file);
       }
     }
 
-    // Library Center Modals
-    function openLibraryModal() { document.getElementById('library-modal').style.display = 'flex'; }
-    function createSnapshot() {
-      const snapId = 'pandora_snap_' + Date.now();
-      localStorage.setItem(snapId, JSON.stringify(PandoraState));
-      alert("Snapshot Created locally in browser storage.");
-    }
-    function downloadFullBackup() {
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(PandoraState));
-      const dl = document.createElement('a');
-      dl.setAttribute("href", dataStr);
-      dl.setAttribute("download", "pandoras_box_backup.json");
-      dl.click();
-    }
-    function restoreFromBackup(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = e => {
-        try { PandoraState = JSON.parse(e.target.result); saveGlobalState(); refreshAppGlobalState(); alert("Restored!"); document.getElementById('library-modal').style.display='none';} 
-        catch (err) { alert("Invalid file."); }
-      };
-      reader.readAsText(file);
+    function openLibraryModal() { document.getElementById("library-modal").style.display = "flex"; }
+    function closeLibraryModal() { document.getElementById("library-modal").style.display = "none"; }
+
+    function exportLibraryData() {
+      const blob = new Blob([JSON.stringify(PandoraState, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `pandora_backup_${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
     }
 
-    /* =====================================================
-       4. EBBINGHAUS FLASHCARD LOGIC (COMPLETED & INTEGRATED)
-       ===================================================== */
-    
-    // Syncs the PandoraState book dictionary into a flat array for the Ebbinghaus engine
-    function syncAllCardsView() {
-      allCardsView = [];
-      Object.values(PandoraState.books).forEach(book => {
-        if (book.flashcards) {
-          book.flashcards.forEach(c => { c.bookId = book.id; c.bookTitle = book.title; allCardsView.push(c); });
-        }
-      });
-    }
-
-    function getBookPalette(title) {
-      let hash = 0;
-      for (let i = 0; i < title.length; i++) hash = title.charCodeAt(i) + ((hash << 5) - hash);
-      return PASTEL_PALETTES[Math.abs(hash) % PASTEL_PALETTES.length];
-    }
-
-    function applyBookTheme(bookId) {
-      if (bookId === 'ALL' || bookId === 'MULTI') {
-        document.documentElement.style.setProperty('--accent-color', '#f59e0b');
-        document.documentElement.style.setProperty('--accent-glow', 'rgba(245, 158, 11, 0.25)');
-      } else {
-        const b = PandoraState.books[bookId];
-        if (b) {
-          const palette = getBookPalette(b.title);
-          document.documentElement.style.setProperty('--accent-color', palette.accent);
-          document.documentElement.style.setProperty('--accent-glow', `${palette.border}40`);
-        }
+    function importLibraryData(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          try {
+            PandoraState = JSON.parse(evt.target.result);
+            saveGlobalState();
+            updateUI();
+            renderBookshelf();
+            closeLibraryModal();
+            alert("Library restored successfully!");
+          } catch (err) { alert("Invalid backup JSON file."); }
+        };
+        reader.readAsText(file);
       }
     }
 
-    function updateBookshelf() {
-      const shelf = document.getElementById('bookshelf');
-      shelf.innerHTML = '';
-      if (Object.keys(PandoraState.books).length === 0) {
-        shelf.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem; padding: 10px;">Bookshelf is empty. Go to Home to create a book.</div>';
-        return;
-      }
+    function renderBookshelf() {
+      const shelf = document.getElementById("bookshelf");
+      shelf.innerHTML = "";
+      Object.keys(PandoraState.books).forEach(id => {
+        const book = PandoraState.books[id];
+        const tile = document.createElement("div");
+        tile.className = `book-tile ${id === PandoraState.activeBookId ? "active" : ""}`;
+        tile.onclick = () => switchDeck(id);
 
-      // All Books Tile
-      const allTile = document.createElement('div');
-      allTile.className = `book-tile ${currentBookFilter === 'ALL' ? 'active' : ''}`;
-      allTile.onclick = () => filterByBook('ALL');
-      allTile.innerHTML = `<div class="book-fallback" style="color:var(--text-main);">ALL BOOKS</div>`;
-      shelf.appendChild(allTile);
-
-      Object.values(PandoraState.books).forEach(b => {
-        const palette = getBookPalette(b.title);
-        const tile = document.createElement('div');
-        tile.className = `book-tile ${currentBookFilter === b.id ? 'active' : ''}`;
-        tile.style.backgroundColor = palette.bg; tile.style.borderColor = palette.border;
-        tile.onclick = () => filterByBook(b.id);
-        
-        const contentDiv = document.createElement('div');
-        contentDiv.style.width = '100%'; contentDiv.style.height = '100%'; contentDiv.style.display = 'flex'; contentDiv.style.alignItems = 'center'; contentDiv.style.justifyContent = 'center';
-        if (b.coverImage) {
-          contentDiv.innerHTML = `<img src="${b.coverImage}">`;
+        if (book.cover) {
+          tile.innerHTML = `<img src="${book.cover}" alt="${book.title}">`;
         } else {
-          contentDiv.innerHTML = `<div class="book-fallback" style="color:${palette.text};">${b.title}</div>`;
+          tile.innerHTML = `<div class="book-fallback">${book.title}</div>`;
         }
-        tile.appendChild(contentDiv);
         shelf.appendChild(tile);
       });
     }
 
-    function populateBookSelect() {
-      const select = document.getElementById('book-select');
-      select.innerHTML = '<option value="ALL">All Books Combined</option>';
-      if (selectedBooks.length > 0) select.innerHTML += `<option value="MULTI">Custom Interleaved</option>`;
-      Object.values(PandoraState.books).forEach(b => {
-        select.innerHTML += `<option value="${b.id}">${b.title}</option>`;
-      });
-      select.value = currentBookFilter;
-    }
-
-    function filterByBook(bookId) {
-      currentBookFilter = bookId;
-      document.getElementById('book-select').value = bookId;
-      applyBookTheme(bookId);
-      updateBookshelf();
-      applyFilter();
-    }
-
-    function interleaveArray(array) {
-      const copy = [...array];
-      for (let i = copy.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [copy[i], copy[j]] = [copy[j], copy[i]];
-      }
-      return copy;
-    }
-
-    function applyFilter() {
-      syncAllCardsView();
-      let baseList = [];
-      if (currentBookFilter === 'ALL') baseList = interleaveArray([...allCardsView]);
-      else if (currentBookFilter === 'MULTI') baseList = interleaveArray(allCardsView.filter(c => selectedBooks.includes(c.bookId)));
-      else baseList = allCardsView.filter(c => c.bookId === currentBookFilter);
-
-      const now = new Date();
-      if (dueOnlyFilter) {
-        filteredCards = baseList.filter(c => (!c.nextDueDate) || new Date(c.nextDueDate) <= now);
-      } else {
-        filteredCards = baseList;
-      }
-      currentIndex = 0;
-      updateBoxCounts();
-      renderCard();
-    }
-
-    function updateBoxCounts() {
-      const now = new Date();
-      let b1=0, b2=0, b3=0, b4=0, b5=0, bm=0, due=0;
-      
-      let targetSet = currentBookFilter === 'ALL' ? allCardsView : (currentBookFilter === 'MULTI' ? allCardsView.filter(c => selectedBooks.includes(c.bookId)) : allCardsView.filter(c=>c.bookId === currentBookFilter));
-      
-      targetSet.forEach(c => {
-        if (c.box === 1) b1++; else if (c.box===2) b2++; else if (c.box===3) b3++; else if (c.box===4) b4++; else if (c.box===5) b5++; else bm++;
-        if ((!c.nextDueDate || new Date(c.nextDueDate) <= now) && c.box < 6) due++;
-      });
-      
-      document.getElementById('due-count').textContent = due;
-      document.getElementById('b1-count').textContent = b1; document.getElementById('b2-count').textContent = b2;
-      document.getElementById('b3-count').textContent = b3; document.getElementById('b4-count').textContent = b4;
-      document.getElementById('b5-count').textContent = b5; document.getElementById('bm-count').textContent = bm;
-    }
-
-    function toggleDueFilter() {
-      dueOnlyFilter = !dueOnlyFilter;
-      const btn = document.getElementById('btn-due-toggle');
-      if (dueOnlyFilter) { btn.classList.add('btn-toggle-active'); btn.textContent = "📅 Due Cards Only (Active)"; } 
-      else { btn.classList.remove('btn-toggle-active'); btn.textContent = "📅 Due Cards Only"; }
-      applyFilter();
-    }
-
-    function toggleGuard(checked) { delayGuardActive = checked; }
-
-    function setMode(mode) {
-      currentMode = mode;
-      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-      document.getElementById(`tab-${mode}`).classList.add('active');
-      document.getElementById('mode-feynman-panel').classList.add('hidden');
-      document.getElementById('mode-cloze-panel').classList.add('hidden');
-      document.getElementById('mode-standard-panel').classList.add('hidden');
-      document.getElementById(`mode-${mode}-panel`).classList.remove('hidden');
-      document.getElementById('model-answer').classList.add('hidden');
-      document.getElementById('anki-controls').classList.add('hidden');
-      renderCard();
-    }
-
-    function renderCard() {
-      const total = filteredCards.length;
-      document.getElementById('card-counter').textContent = `Q${total > 0 ? currentIndex + 1 : 0}/${total}`;
-      
-      document.getElementById('model-answer').classList.add('hidden');
-      document.getElementById('anki-controls').classList.add('hidden');
-      
-      // Reset reveal buttons
-      document.querySelectorAll('.reveal-btn').forEach(btn => {
-        btn.disabled = false;
-        btn.textContent = (currentMode==='feynman')?"Compare with Model Answer" : (currentMode==='cloze')?"Reveal Blank Target":"Show Model Answer";
-      });
-      clearInterval(countdownTimer);
-
-      if (total === 0) {
-        document.getElementById('card-prompt').textContent = dueOnlyFilter ? "No cards currently due!" : "No cards available.";
-        document.getElementById('card-book-title').textContent = "NO CARDS LOADED";
-        document.getElementById('card-box-label').textContent = "-";
-        return;
-      }
-
-      const card = filteredCards[currentIndex];
-      document.getElementById('card-book-title').textContent = card.bookTitle.toUpperCase();
-      document.getElementById('card-box-label').textContent = `LEITNER BOX ${card.box || 1}`;
-      
-      const now = new Date();
-      const dueDate = card.nextDueDate ? new Date(card.nextDueDate) : now;
-      if (dueDate <= now) {
-        document.getElementById('card-due-status').textContent = "Status: Due Now";
-        document.getElementById('card-due-status').style.color = "#16a34a";
-      } else {
-        document.getElementById('card-due-status').textContent = `Due: ${dueDate.toLocaleDateString(undefined, {month:'short', day:'numeric'})}`;
-        document.getElementById('card-due-status').style.color = "var(--text-muted)";
-      }
-
-      if (currentMode === 'cloze' && card.clozeTarget) {
-        const clozePrompt = card.answer.replace(new RegExp(card.clozeTarget, 'gi'), `<span class="cloze-target">[ ${card.clozeTarget.length} letters ]</span>`);
-        document.getElementById('card-prompt').innerHTML = `<strong>Context:</strong> ${card.prompt}<br><br><strong>Challenge:</strong> ${clozePrompt}`;
-      } else {
-        document.getElementById('card-prompt').textContent = card.prompt;
-      }
-    }
-
-    // COMPLETING THE TRUNCATED LOGIC: Delay Guard & Reveal
-    function toggleAnswer() {
-      const card = filteredCards[currentIndex];
-      if (!card) return;
-      const ansBox = document.getElementById('model-answer');
-      const revealBtns = document.querySelectorAll('.reveal-btn');
-      
-      if (delayGuardActive && ansBox.classList.contains('hidden')) {
-        let count = 3;
-        revealBtns.forEach(btn => { btn.disabled = true; btn.textContent = `Wait... ${count}s`; });
-        countdownTimer = setInterval(() => {
-          count--;
-          revealBtns.forEach(btn => btn.textContent = `Wait... ${count}s`);
-          if (count <= 0) {
-            clearInterval(countdownTimer);
-            revealBtns.forEach(btn => btn.style.display = 'none'); // hide button after reveal
-            showAnswerLogic(card, ansBox);
-          }
-        }, 1000);
-      } else {
-        revealBtns.forEach(btn => btn.style.display = 'none');
-        showAnswerLogic(card, ansBox);
-      }
-    }
-
-    function showAnswerLogic(card, ansBox) {
-      if(currentMode === 'cloze') {
-         ansBox.innerHTML = `<strong>Full Target:</strong> ${card.clozeTarget || card.answer}`;
-      } else {
-         ansBox.innerHTML = card.answer.replace(/\n/g, '<br>');
-      }
-      ansBox.classList.remove('hidden');
-      document.getElementById('anki-controls').classList.remove('hidden');
-      
-      // Card Flip CSS Effect Trigger
-      document.getElementById('fc-main-card').style.transform = "rotateX(360deg)";
-      setTimeout(()=> document.getElementById('fc-main-card').style.transform = "none", 400);
-    }
-
-    // COMPLETING THE TRUNCATED LOGIC: SM-2 Calculations
-    function rateCard(quality) {
-      const card = filteredCards[currentIndex];
-      if (!card) return;
-      
-      if (!card.repetition) card.repetition = 0;
-      if (!card.interval) card.interval = 1;
-      if (!card.easeFactor) card.easeFactor = 2.5;
-
-      let qVal = 0;
-      if (quality === 'again') { qVal = 0; card.repetition = 0; card.interval = 1; card.box = 1; }
-      else if (quality === 'hard') { qVal = 3; card.interval = card.interval * 1.2; }
-      else if (quality === 'good') { qVal = 4; card.repetition++; card.interval = (card.repetition === 1) ? 1 : (card.repetition === 2) ? 6 : card.interval * card.easeFactor; card.box = Math.min(card.box + 1, 6); }
-      else if (quality === 'easy') { qVal = 5; card.repetition++; card.interval = (card.repetition === 1) ? 4 : card.interval * card.easeFactor * 1.3; card.box = Math.min(card.box + 2, 6); }
-
-      card.easeFactor = card.easeFactor + (0.1 - (5 - qVal) * (0.08 + (5 - qVal) * 0.02));
-      if (card.easeFactor < 1.3) card.easeFactor = 1.3;
-      
-      card.interval = Math.round(card.interval);
-      card.nextDueDate = new Date(Date.now() + card.interval * 24 * 60 * 60 * 1000).toISOString();
-
-      // Find in PandoraState and update
-      const bIndex = PandoraState.books[card.bookId].flashcards.findIndex(c => c.id === card.id);
-      if (bIndex > -1) {
-        PandoraState.books[card.bookId].flashcards[bIndex] = card;
-      }
-      saveGlobalState();
-
-      // Move Next
-      document.querySelectorAll('.reveal-btn').forEach(btn => btn.style.display = 'block'); // reset buttons
-      if (currentIndex < filteredCards.length - 1) {
-        currentIndex++;
-        renderCard();
-      } else {
-        applyFilter(); // reload queue
-      }
-    }
-
-    // CARD MANAGER MODAL
-    function openCardManager() {
-      const list = document.getElementById('card-manager-list');
-      list.innerHTML = '';
-      syncAllCardsView();
-      let targets = currentBookFilter === 'ALL' ? allCardsView : allCardsView.filter(c => c.bookId === currentBookFilter);
-      targets.forEach(c => {
-        list.innerHTML += `
-          <div style="padding:10px; border-bottom:1px solid var(--border-color); font-size:0.85rem; display:flex; justify-content:space-between;">
-            <div><strong>${c.bookTitle}:</strong> ${c.prompt.substring(0,30)}...</div>
-            <div>
-              <button onclick="editCard('${c.bookId}', '${c.id}')" style="background:#0A84FF; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Edit</button>
-              <button onclick="deleteCard('${c.bookId}', '${c.id}')" style="background:#dc2626; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Del</button>
-            </div>
-          </div>`;
-      });
-      document.getElementById('card-manager-modal').style.display = 'flex';
-    }
-
-    let editingFcId = null;
-    let editingFcBookId = null;
-    function openAddCardModal() {
-      if (currentBookFilter === 'ALL' || currentBookFilter === 'MULTI') {
-        alert("Please select a specific book from the dropdown first to add a card to it.");
-        return;
-      }
-      editingFcId = 'fc_' + Date.now();
-      editingFcBookId = currentBookFilter;
-      document.getElementById('edit-modal-title').textContent = "Add New Card";
-      document.getElementById('edit-card-book').value = PandoraState.books[editingFcBookId].title;
-      document.getElementById('edit-card-prompt').value = "";
-      document.getElementById('edit-card-answer').value = "";
-      document.getElementById('edit-card-cloze').value = "";
-      document.getElementById('card-manager-modal').style.display = 'none';
-      document.getElementById('edit-card-modal').style.display = 'flex';
-    }
-
-    function editCard(bookId, cardId) {
-      editingFcBookId = bookId;
-      editingFcId = cardId;
-      const c = PandoraState.books[bookId].flashcards.find(x => x.id === cardId);
-      if (!c) return;
-      document.getElementById('edit-modal-title').textContent = "Edit Card";
-      document.getElementById('edit-card-book').value = PandoraState.books[bookId].title;
-      document.getElementById('edit-card-prompt').value = c.prompt;
-      document.getElementById('edit-card-answer').value = c.answer;
-      document.getElementById('edit-card-cloze').value = c.clozeTarget || "";
-      document.getElementById('card-manager-modal').style.display = 'none';
-      document.getElementById('edit-card-modal').style.display = 'flex';
-    }
-
-    function saveCardEdit() {
-      const prompt = document.getElementById('edit-card-prompt').value.trim();
-      const answer = document.getElementById('edit-card-answer').value.trim();
-      if (!prompt || !answer) return alert("Prompt and answer required.");
-      
-      const cloze = document.getElementById('edit-card-cloze').value.trim();
-      const targetArr = PandoraState.books[editingFcBookId].flashcards;
-      const existingIdx = targetArr.findIndex(c => c.id === editingFcId);
-      
-      if (existingIdx > -1) {
-        targetArr[existingIdx].prompt = prompt; targetArr[existingIdx].answer = answer; targetArr[existingIdx].clozeTarget = cloze;
-      } else {
-        targetArr.push({ id: editingFcId, prompt, answer, clozeTarget: cloze, box: 1, interval: 1, easeFactor: 2.5, repetition: 0, nextDueDate: new Date().toISOString() });
-      }
-      
-      saveGlobalState();
-      document.getElementById('edit-card-modal').style.display = 'none';
-      applyFilter();
-    }
-
-    function deleteCard(bookId, cardId) {
-      if(confirm("Delete this card?")) {
-        PandoraState.books[bookId].flashcards = PandoraState.books[bookId].flashcards.filter(c => c.id !== cardId);
-        saveGlobalState();
-        openCardManager(); // refresh list
-      }
-    }
-
-    // Interleave Modal
-    function openInterleaveModal() {
-      const div = document.getElementById('interleave-checkboxes');
-      div.innerHTML = '';
-      Object.values(PandoraState.books).forEach(b => {
-        const checked = selectedBooks.includes(b.id) ? "checked" : "";
-        div.innerHTML += `<label><input type="checkbox" value="${b.id}" ${checked}> ${b.title}</label>`;
-      });
-      document.getElementById('interleave-modal').style.display = 'flex';
-    }
-    
-    function applyInterleavedSelection() {
-      selectedBooks = Array.from(document.querySelectorAll('#interleave-checkboxes input:checked')).map(cb => cb.value);
-      if (selectedBooks.length > 0) filterByBook('MULTI');
-      document.getElementById('interleave-modal').style.display = 'none';
-    }
+    function openCardManager() { document.getElementById("card-manager-modal").style.display = "flex"; }
+    function closeCardManager() { document.getElementById("card-manager-modal").style.display = "none"; }
+    function revealAnswer() { document.getElementById("answer-section").classList.remove("hidden"); document.getElementById("anki-controls").classList.remove("hidden"); }
+    function rateCard(rating) { document.getElementById("answer-section").classList.add("hidden"); document.getElementById("anki-controls").classList.add("hidden"); }
+    function openCreateCardModal() { openCardEditModal(); }
+    function openCardEditModal() { document.getElementById("edit-card-modal").style.display = "flex"; }
+    function closeCardEditModal() { document.getElementById("edit-card-modal").style.display = "none"; }
+    function saveCardEdit() { closeCardEditModal(); }
+    function toggleDueOnly() {}
   </script>
 </body>
 </html>
+
