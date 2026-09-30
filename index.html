@@ -426,7 +426,13 @@
          CHARACTER MAP MODULE (SELF-CONTAINED BULLETPROOF ENGINE)
          ===================================================== -->
     <div id="map-view" class="view-section">
-  <canvas id="character-map-canvas" width="800" height="600"></canvas>
+  <div id="map-view" class="view-section">
+  <div class="map-controls" style="margin-bottom: 10px; display: flex; gap: 10px;">
+    <button onclick="addCharacterNode(prompt('Enter Character Name:'))">Add Character</button>
+  </div>
+  <canvas id="character-map-canvas" width="800" height="600" style="border: 1px solid #334155; background: #0f172a;"></canvas>
+</div>
+      <canvas id="character-map-canvas" width="800" height="600"></canvas>
 </div>
     <!-- Vis.js Graph Engine CDN -->
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
